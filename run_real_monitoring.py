@@ -1,16 +1,26 @@
 import json
 import time
+import joblib
+import numpy as np
 
-from src.prediction.risk_engine import calculate_fire_risk
 from src.alerts.email_alert import send_fire_alert
 
-print("🔥 Fire Monitoring Started...")
+# =========================
+# LOAD AI MODEL
+# =========================
+
+model = joblib.load("best_model.pkl")
+
+print("🔥 AI Fire Monitoring Started...")
 
 while True:
 
     try:
 
-        # Load ETL data
+        # =========================
+        # LOAD ETL DATA
+        # =========================
+
         with open(
             "data/meteo_daily/latest_weather.json",
             "r"
@@ -18,40 +28,67 @@ while True:
 
             weather = json.load(f)
 
-        # Extract values
+        # =========================
+        # EXTRACT VALUES
+        # =========================
+
         temperature = weather["temperature"]
 
         humidity = weather["humidite"]
 
+        precipitation = weather["precipitation"]
+
         wind_speed = weather["vent"]
 
-        # Temporary NDVI
-        ndvi = 0.2
+        # =========================
+        # AI PREDICTION
+        # =========================
 
-        # Calculate risk
-        risk = calculate_fire_risk(
+        features = np.array([[
             temperature,
             humidity,
-            wind_speed,
-            ndvi
-        )
+            precipitation,
+            wind_speed
+        ]])
 
-        print(f"🔥 Current Risk: {risk}")
+        prediction = model.predict(features)[0]
 
-        # Send automatic alert
-        if risk in ["Élevé", "Très élevé"]:
+        # =========================
+        # RISK LEVEL
+        # =========================
+
+        if prediction == 1:
+
+            risk = "Élevé"
+
+        else:
+
+            risk = "Faible"
+
+        print(f"\n🔥 AI Current Risk: {risk}")
+
+        # =========================
+        # EMAIL ALERT
+        # =========================
+
+        if risk == "Élevé":
 
             message = f"""
-            Fire Risk Alert
+            🔥 FIRE RISK ALERT 🔥
+
+            AI detected a HIGH wildfire risk.
 
             Risk Level: {risk}
 
             Temperature: {temperature} °C
             Humidity: {humidity} %
+            Precipitation: {precipitation} mm
             Wind Speed: {wind_speed} km/h
             """
 
             send_fire_alert(message)
+
+            print("✅ Alert email sent")
 
         else:
 
@@ -61,5 +98,8 @@ while True:
 
         print(f"❌ Error: {e}")
 
-    # Wait 5 minutes
+    # =========================
+    # WAIT 5 MINUTES
+    # =========================
+
     time.sleep(300)
