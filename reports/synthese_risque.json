@@ -1,0 +1,69 @@
+{
+  "date_generation": "2026-05-11T11:16:22.020615",
+  "zone": {
+    "nom": "Agdez",
+    "pays": "Maroc",
+    "latitude": 30.69,
+    "longitude": -6.45,
+    "pente_moy_deg": 5.73,
+    "altitude_m": 1169.3,
+    "exposition_deg": 165.51
+  },
+  "scenarios_2026": {
+    "fichier": "C:\\Users\\hp\\Desktop\\oasis_fire_project\\models\\metadata\\predictions_scenarios_2026.csv",
+    "nb_scenarios": 10,
+    "nb_alertes_eleve": 8
+  },
+  "projections_climatiques": {
+    "fichier": "C:\\Users\\hp\\Desktop\\oasis_fire_project\\models\\metadata\\projections_climatiques.csv",
+    "nb_annees": 10,
+    "annees_critiques": [
+      2026,
+      2027,
+      2028,
+      2029,
+      2030,
+      2031,
+      2032,
+      2033,
+      2034,
+      2035
+    ]
+  },
+  "alertes": [
+    {
+      "timestamp": "2026-05-05T01:40:02.995945",
+      "zone": "Agdez",
+      "pays": "Maroc",
+      "scenario": "Sécheresse août 2026 (Prec<1mm)",
+      "risque": "Très élevé",
+      "confiance": 0.5116,
+      "priorite": "CRITIQUE",
+      "message": "DANGER IMMÉDIAT — activation du plan ORSEC forêt",
+      "probas": {}
+    },
+    {
+      "timestamp": "2026-05-05T01:40:03.018755",
+      "zone": "Agdez",
+      "pays": "Maroc",
+      "scenario": "Août 2026 + réchauffement +2°C",
+      "risque": "Très élevé",
+      "confiance": 0.5566,
+      "priorite": "CRITIQUE",
+      "message": "DANGER IMMÉDIAT — activation du plan ORSEC forêt",
+      "probas": {}
+    },
+    {
+      "timestamp": "2026-05-05T01:40:03.025693",
+      "zone": "Agdez",
+      "pays": "Maroc",
+      "scenario": "Après pluies intenses (P>40mm)",
+      "risque": "Élevé",
+      "confiance": 0.39,
+      "priorite": "HAUTE",
+      "message": "VIGILANCE RENFORCÉE — patrouilles et surveillance active",
+      "probas": {}
+    }
+  ],
+  "recommandations": "Activer les mesures d'urgence pour les scénarios à risque très élevé"
+}

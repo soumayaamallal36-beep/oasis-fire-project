@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-05-21T13:08:06.896209",
+  "risque": "Élevé",
+  "priorite": "HAUTE",
+  "confiance": 0.45,
+  "zone": "Agdez, Drâa-Tafilalet, Maroc",
+  "conditions": {
+    "temperature": 38.0,
+    "humidite": 8.0,
+    "precipitation": 0.0,
+    "vent": 6.5
+  },
+  "probabilites": {
+    "Faible": 0.0,
+    "Moyen": 0.165,
+    "Élevé": 0.45,
+    "Très élevé": 0.385
+  },
+  "recommandation": "🟠 Patrouilles terrain actives. Alerter les équipes.",
+  "envoi": {
+    "email": {
+      "succes": false,
+      "erreur": "please run connect() first"
+    }
+  }
+}

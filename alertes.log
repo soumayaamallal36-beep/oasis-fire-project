@@ -1,0 +1,80 @@
+2026-05-21 10:16:33,077 [INFO] ✅ Configuration chargée depuis config_alertes.json
+2026-05-21 10:16:33,081 [INFO] 🧪 Mode TEST — envoi forcé d'une alerte
+2026-05-21 10:16:33,082 [INFO] 🔍 Vérification en cours — 21/05/2026 10:16:33
+2026-05-21 10:16:35,279 [INFO] 🌡️  T=27.7°C H=18.0% P=0.00mm V=1.2m/s
+2026-05-21 10:16:49,197 [INFO] 🟠 Risque prédit : Élevé (confiance 44%)
+2026-05-21 10:16:49,198 [WARNING] 🚨 ALERTE HAUTE — envoi en cours…
+2026-05-21 10:16:49,224 [ERROR] ❌ Erreur email : please run connect() first
+2026-05-21 10:16:49,230 [INFO] 💾 Alerte sauvegardée : alerte_20260521_101649_Élevé.json
+2026-05-21 10:16:49,234 [INFO] Résultat : {
+  "risque": "Élevé",
+  "confiance": 0.4434375,
+  "email": {
+    "succes": false,
+    "erreur": "please run connect() first"
+  },
+  "json": {
+    "succes": true,
+    "fichier": "C:\\Users\\hp\\Desktop\\oasis_fire_project\\reports\\alerte_20260521_101649_Élevé.json"
+  },
+  "alerte_envoyee": true
+}
+2026-05-21 10:18:20,300 [INFO] ✅ Configuration chargée depuis config_alertes.json
+2026-05-21 10:18:20,301 [INFO] 🧪 Mode TEST — envoi forcé d'une alerte
+2026-05-21 10:18:20,301 [INFO] 🔍 Vérification en cours — 21/05/2026 10:18:20
+2026-05-21 10:18:20,304 [WARNING] API météo indisponible : No module named 'requests'
+2026-05-21 10:18:20,304 [WARNING] ⚠️  Données météo indisponibles — vérification annulée
+2026-05-21 10:18:20,305 [INFO] Résultat : {
+  "succes": false,
+  "raison": "API météo indisponible"
+}
+2026-05-21 10:18:43,385 [INFO] ✅ Configuration chargée depuis config_alertes.json
+2026-05-21 10:18:43,386 [INFO] 🔄 Surveillance continue démarrée
+2026-05-21 10:18:43,386 [INFO]    Intervalle : 30 min | Cooldown : 60 min
+2026-05-21 10:18:43,387 [INFO]    Niveaux d'alerte : Élevé, Très élevé
+2026-05-21 10:18:43,387 [INFO]    📧 Email → soumaya.amallal.36@edu.uiz.ac.ma, commune@agdez.ma, protection.civile@zagora.ma
+2026-05-21 10:18:43,387 [INFO]    Appuyez sur Ctrl+C pour arrêter
+
+2026-05-21 10:18:43,388 [INFO] 🔍 Vérification en cours — 21/05/2026 10:18:43
+2026-05-21 10:18:44,862 [INFO] 🌡️  T=27.7°C H=18.0% P=0.00mm V=1.2m/s
+2026-05-21 10:18:50,665 [INFO] 🟠 Risque prédit : Élevé (confiance 44%)
+2026-05-21 10:18:50,667 [INFO] ⏳ Cooldown actif — prochaine alerte dans 58 min
+2026-05-21 10:18:50,668 [INFO] ⏰ Prochaine vérification : 10:48:50
+
+2026-05-21 10:48:50,744 [INFO] 🔍 Vérification en cours — 21/05/2026 10:48:50
+2026-05-21 10:48:51,891 [INFO] 🌡️  T=28.8°C H=17.0% P=0.00mm V=1.7m/s
+2026-05-21 10:48:52,366 [INFO] 🟠 Risque prédit : Élevé (confiance 50%)
+2026-05-21 10:48:52,369 [INFO] ⏳ Cooldown actif — prochaine alerte dans 28 min
+2026-05-21 10:48:52,370 [INFO] ⏰ Prochaine vérification : 11:18:52
+
+2026-05-21 11:08:54,848 [INFO] 
+🛑 Surveillance arrêtée par l'utilisateur.
+2026-05-21 11:09:00,012 [INFO] ✅ Configuration chargée depuis config_alertes.json
+2026-05-21 11:09:00,014 [INFO] 🔄 Surveillance continue démarrée
+2026-05-21 11:09:00,014 [INFO]    Intervalle : 30 min | Cooldown : 60 min
+2026-05-21 11:09:00,015 [INFO]    Niveaux d'alerte : Élevé, Très élevé
+2026-05-21 11:09:00,015 [INFO]    📧 Email → soumaya.amallal.36@edu.uiz.ac.ma, commune@agdez.ma, protection.civile@zagora.ma
+2026-05-21 11:09:00,016 [INFO]    Appuyez sur Ctrl+C pour arrêter
+
+2026-05-21 11:09:00,016 [INFO] 🔍 Vérification en cours — 21/05/2026 11:09:00
+2026-05-21 11:09:00,954 [INFO] 🌡️  T=29.3°C H=16.0% P=0.00mm V=2.3m/s
+2026-05-21 11:09:04,608 [INFO] 🟠 Risque prédit : Élevé (confiance 45%)
+2026-05-21 11:09:04,609 [INFO] ⏳ Cooldown actif — prochaine alerte dans 8 min
+2026-05-21 11:09:04,609 [INFO] ⏰ Prochaine vérification : 11:39:04
+
+2026-05-21 11:39:04,678 [INFO] 🔍 Vérification en cours — 21/05/2026 11:39:04
+2026-05-21 11:39:05,774 [INFO] 🌡️  T=30.1°C H=15.0% P=0.00mm V=3.0m/s
+2026-05-21 11:39:06,240 [INFO] 🟠 Risque prédit : Élevé (confiance 49%)
+2026-05-21 11:39:06,243 [WARNING] 🚨 ALERTE HAUTE — envoi en cours…
+2026-05-21 11:39:06,259 [ERROR] ❌ Erreur email : please run connect() first
+2026-05-21 11:39:06,267 [INFO] 💾 Alerte sauvegardée : alerte_20260521_113906_Élevé.json
+2026-05-21 11:39:06,269 [INFO] ⏰ Prochaine vérification : 12:09:06
+
+2026-05-21 12:09:06,360 [INFO] 🔍 Vérification en cours — 21/05/2026 12:09:06
+2026-05-21 12:09:07,730 [INFO] 🌡️  T=30.8°C H=15.0% P=0.00mm V=3.6m/s
+2026-05-21 12:09:08,295 [INFO] 🔴 Risque prédit : Très élevé (confiance 47%)
+2026-05-21 12:09:08,298 [INFO] ⏳ Cooldown actif — prochaine alerte dans 30 min
+2026-05-21 12:09:08,301 [INFO] ⏰ Prochaine vérification : 12:39:08
+
+2026-05-21 12:30:07,873 [INFO] 
+🛑 Surveillance arrêtée par l'utilisateur.

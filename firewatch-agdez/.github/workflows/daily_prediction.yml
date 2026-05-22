@@ -1,0 +1,30 @@
+name: Daily Prediction
+on:
+  schedule:
+    - cron: '0 8 * * *' # Every day at 8:00 UTC
+  workflow_dispatch:
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install deps
+        run: pip install -r requirements.txt
+        
+      - name: Run prediction and alert
+        env:
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python -c "
+          import requests
+          res = requests.get('http://localhost:8000/current-risk')
+          # Handle API output logic or call scripts directly
+          "

@@ -1,0 +1,46 @@
+======================================================================
+RAPPORT PRÉDICTION RISQUE INCENDIE — AGDEZ
+Généré le : 2026-05-11 11:16:22
+======================================================================
+
+1. ZONE D'ÉTUDE
+   Nom      : Agdez
+   Pays     : Maroc
+   Coordonnées : 30.69, -6.45
+   Altitude : 1169.3 m
+   Pente    : 5.73°
+
+2. MODÈLE UTILISÉ
+   Meilleur algorithme : Random Forest
+   Précision CV (5 folds) : 0.767
+   Features utilisées : 13
+
+3. SCÉNARIOS 2026
+   Résultats par catégorie :
+   • Normal : 3 scénario(s)
+     → 2 scénario(s) avec risque Élevé ou Très élevé
+   • Extrême : 3 scénario(s)
+     → 3 scénario(s) avec risque Élevé ou Très élevé
+   • CC +2°C : 2 scénario(s)
+     → 2 scénario(s) avec risque Élevé ou Très élevé
+   • Atténué : 2 scénario(s)
+     → 1 scénario(s) avec risque Élevé ou Très élevé
+
+   Détail complet dans models/metadata/predictions_scenarios_2026.csv
+
+4. PROJECTIONS CLIMATIQUES (2026-2035)
+   Tendances linéaires estimées sur la base des années 2017-2025.
+   Années avec risque Élevé ou Très élevé : 10 sur 10
+   Années critiques : 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035
+
+   Fichier complet : models/metadata/projections_climatiques.csv
+
+5. ALERTES DÉCLENCHÉES
+   • 2026-05-05T01:40 : Très élevé (CRITIQUE) - Sécheresse août 2026 (Prec<1mm)
+   • 2026-05-05T01:40 : Très élevé (CRITIQUE) - Août 2026 + réchauffement +2°C
+   • 2026-05-05T01:40 : Élevé (HAUTE) - Après pluies intenses (P>40mm)
+
+6. RECOMMANDATIONS
+   ⚠️  Risque TRÈS ÉLEVÉ détecté dans certains scénarios.
+      → Activer immédiatement les mesures de surveillance renforcée.
+      → Continuer la collecte de données pour affiner les modèles.

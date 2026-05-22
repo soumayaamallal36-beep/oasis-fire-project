@@ -1,0 +1,19 @@
+{
+  "email": {
+    "actif": true,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "soumaya.amallal.36@edu.uiz.ac.ma",
+    "smtp_password": "iwnq yqfx kcce dolm",
+    "expediteur_nom": "Système Alerte Incendie Agdez",
+    "destinataires": [
+      "amallalsoumaya@gmail.com"
+    ]
+  },
+  "options": {
+    "cooldown_minutes": 60,
+    "intervalle_minutes": 30,
+    "sauvegarder_json": true,
+    "niveaux_alerte": ["Élevé", "Très élevé"]
+  }
+}

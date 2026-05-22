@@ -1,0 +1,50 @@
+{
+  "name": "Meteo Collection",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "latitude", "value": "30.6936" },
+            { "name": "longitude", "value": "-6.4497" },
+            { "name": "current_weather", "value": "true" }
+          ]
+        }
+      },
+      "name": "HTTP Request Meteo",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Meteo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

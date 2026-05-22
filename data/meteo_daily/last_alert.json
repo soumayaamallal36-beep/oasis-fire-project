@@ -1,0 +1,18 @@
+{
+  "date": "2026-05-12T13:24:39.836519",
+  "risk": "Élevé",
+  "confidence": 0.59,
+  "probas": {
+    "Faible": 0.0,
+    "Moyen": 0.16,
+    "Élevé": 0.59,
+    "Très élevé": 0.25
+  },
+  "weather": {
+    "temperature": 28.9,
+    "humidite": 16,
+    "precipitation": 0.0,
+    "vent": 4.0,
+    "timestamp": "2026-05-12T13:24:39.836519"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "Alert Dispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "firewatch-alert",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/alert/test",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "risk_level",
+              "value": "={{$json.body.risk_level}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Trigger Alert API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Trigger Alert API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false
+}

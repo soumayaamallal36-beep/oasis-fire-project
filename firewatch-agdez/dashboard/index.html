@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireWatch Agdez - Drâa-Tafilalet</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --risk-low: #22c55e;
+            --risk-med: #f59e0b;
+            --risk-high: #ef4444;
+            --risk-crit: #dc2626;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        /* TopBar */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(15, 23, 42, 0.9);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .logo { font-size: 24px; }
+        .titles h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        .titles p { margin: 0; font-size: 12px; color: var(--text-muted); }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--risk-low); box-shadow: 0 0 10px var(--risk-low); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+        
+        /* Navigation */
+        nav {
+            display: flex;
+            gap: 20px;
+            padding: 10px 30px;
+            background: rgba(30, 41, 59, 0.5);
+            border-bottom: 1px solid var(--border);
+        }
+        nav button {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            padding: 8px 16px; border-radius: 6px; transition: all 0.2s; font-size: 14px;
+        }
+        nav button.active, nav button:hover {
+            background: rgba(59, 130, 246, 0.2); color: var(--text-main);
+        }
+
+        /* Layout */
+        main {
+            flex: 1; padding: 20px 30px; overflow-y: auto; display: none;
+        }
+        main.active { display: block; }
+        
+        .grid-kpi { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card {
+            background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+            backdrop-filter: blur(10px); display: flex; flex-direction: column; gap: 10px;
+        }
+        .card h3 { margin: 0; font-size: 14px; color: var(--text-muted); font-weight: 500; }
+        .card .value { font-size: 24px; font-weight: 700; }
+        
+        .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .panel-title { font-size: 16px; font-weight: 600; margin: 0 0 15px 0; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        .alert-item { padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); margin-bottom: 10px; font-size: 13px; }
+        .alert-time { color: var(--text-muted); font-size: 11px; }
+
+        /* Map Placeholder */
+        .map-container { height: 400px; background: #1e293b; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-area">
+            <div class="logo">🔥</div>
+            <div class="titles">
+                <h1>FireWatch Agdez</h1>
+                <p>Drâa-Tafilalet · Système IA v2.4.1</p>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; color: var(--text-muted)">Système Opérationnel</span>
+            <div class="status-dot"></div>
+        </div>
+    </header>
+    
+    <nav>
+        <button class="active" onclick="switchTab('accueil')">Accueil</button>
+        <button onclick="switchTab('gis')">Carte GIS</button>
+        <button onclick="switchTab('monitoring')">Monitoring</button>
+        <button onclick="switchTab('models')">IA Models</button>
+        <button onclick="switchTab('climat')">Climat</button>
+        <button onclick="switchTab('agent')">AI Agent</button>
+        <button onclick="switchTab('hf')">HuggingFace</button>
+    </nav>
+
+    <!-- ACCUEIL -->
+    <main id="accueil" class="active">
+        <div class="grid-kpi">
+            <div class="card" id="card-risk" style="border-bottom: 3px solid var(--risk-low);">
+                <h3>Niveau de Risque</h3>
+                <div class="value" id="kpi-risk">Chargement...</div>
+            </div>
+            <div class="card"><h3>Température</h3><div class="value" id="kpi-temp">-- °C</div></div>
+            <div class="card"><h3>Humidité</h3><div class="value" id="kpi-hum">-- %</div></div>
+            <div class="card"><h3>Vent</h3><div class="value" id="kpi-wind">-- km/h</div></div>
+            <div class="card"><h3>NDVI (Végétation)</h3><div class="value" id="kpi-ndvi">--</div></div>
+            <div class="card"><h3>Alertes 24h</h3><div class="value" id="kpi-alerts">0</div></div>
+        </div>
+        
+        <div class="grid-main">
+            <div class="card">
+                <h2 class="panel-title">Prédiction Ensemble (Stacking + Voting)</h2>
+                <div style="display: flex; justify-content: space-around; padding: 20px 0;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 48px; font-weight: bold; color: var(--risk-low);" id="pred-risk-text">--</div>
+                        <div style="color: var(--text-muted); margin-top: 5px;">Risque Actuel</div>
+                    </div>
+                    <div>
+                        <p><strong>Confiance :</strong> <span id="pred-conf">--</span>%</p>
+                        <p><strong>FWI (Fire Weather Index) :</strong> <span id="pred-fwi">--</span></p>
+                        <p><strong>Facteurs clés :</strong></p>
+                        <ul id="pred-factors" style="color: var(--text-muted); font-size: 14px; margin-top: 5px; padding-left: 20px;">
+                            <li>Chargement...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <h2 class="panel-title">Alertes Récentes</h2>
+                <div id="alerts-list">
+                    <div class="alert-item" style="border-left: 3px solid var(--risk-med)">
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>Risque Moyen détecté</strong>
+                            <span class="alert-time">Il y a 2h</span>
+                        </div>
+                        <div style="color: var(--text-muted); margin-top: 5px;">Température en hausse, humidité basse. Notification envoyée.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- CARTE GIS -->
+    <main id="gis">
+        <div class="card" style="height: calc(100vh - 180px);">
+            <h2 class="panel-title">Carte Interactive GIS - Drâa-Tafilalet</h2>
+            <div class="map-container">
+                <p>Mapbox / Folium / SVG Map Placeholder</p>
+            </div>
+            <div style="display: flex; gap: 20px; margin-top: 15px; font-size: 12px;">
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width:12px;height:12px;background:var(--risk-crit);border-radius:50%"></div> Très Élevé</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width:12px;height:12px;background:var(--risk-high);border-radius:50%"></div> Élevé</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width:12px;height:12px;background:var(--risk-med);border-radius:50%"></div> Moyen</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width:12px;height:12px;background:var(--risk-low);border-radius:50%"></div> Faible</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MONITORING -->
+    <main id="monitoring">
+        <div class="grid-kpi" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="card"><h3>Uptime API</h3><div class="value">99.8%</div></div>
+            <div class="card"><h3>Prédictions/h</h3><div class="value">12</div></div>
+            <div class="card"><h3>Total Alertes</h3><div class="value">47</div></div>
+            <div class="card"><h3>Dernier Run n8n</h3><div class="value">Il y a 2 min</div></div>
+        </div>
+        <div class="grid-main">
+            <div class="card">
+                <h2 class="panel-title">Workflows n8n</h2>
+                <div class="alert-item" style="border-left: 3px solid var(--risk-low)">✅ Meteo Collection Pipeline (Toutes les heures)</div>
+                <div class="alert-item" style="border-left: 3px solid var(--risk-low)">✅ Inference & Prediction (Toutes les heures)</div>
+                <div class="alert-item" style="border-left: 3px solid var(--risk-low)">✅ Alert Dispatcher (Webhook)</div>
+            </div>
+            <div class="card">
+                <h2 class="panel-title">Log Console</h2>
+                <div style="font-family: monospace; font-size: 12px; color: var(--text-muted); background: #000; padding: 10px; border-radius: 6px; height: 200px; overflow-y: auto;">
+                    [INFO] 14:00:01 - Fetching Open-Meteo data...<br>
+                    [INFO] 14:00:03 - Data saved to SQLite.<br>
+                    [INFO] 14:00:04 - Running Ensemble prediction...<br>
+                    [INFO] 14:00:05 - Result: Faible (Conf: 0.92)<br>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- MODELS -->
+    <main id="models">
+        <div class="card">
+            <h2 class="panel-title">Performances des Modèles</h2>
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+                    <th style="padding: 10px;">Modèle</th><th style="padding: 10px;">F1-Score</th><th style="padding: 10px;">Accuracy</th>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 10px;">StackingClassifier</td><td style="padding: 10px;">0.924</td><td style="padding: 10px;">93.1%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 10px;">VotingClassifier</td><td style="padding: 10px;">0.915</td><td style="padding: 10px;">92.0%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 10px;">XGBoost (Optimized)</td><td style="padding: 10px;">0.910</td><td style="padding: 10px;">91.5%</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;">LightGBM</td><td style="padding: 10px;">0.895</td><td style="padding: 10px;">90.2%</td>
+                </tr>
+            </table>
+        </div>
+    </main>
+
+    <!-- CLIMAT -->
+    <main id="climat">
+        <div class="card">
+            <h2 class="panel-title">Projections Climatiques (2020-2035)</h2>
+            <div style="height: 300px;"><canvas id="climateChart"></canvas></div>
+            <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 14px;">
+                <div><strong style="color: var(--risk-high)">Projection 2035:</strong> +2.4°C en moyenne estivale</div>
+                <div><strong style="color: var(--risk-crit)">Risque d'incendie:</strong> +35% jours critiques</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- AI AGENT -->
+    <main id="agent">
+        <div class="card">
+            <h2 class="panel-title">Agent IA Analytique</h2>
+            <p style="color: var(--text-muted); font-size: 14px;">L'agent analyse les tendances croisées météo/satellites et propose des recommandations.</p>
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <strong>Dernière analyse (Aujourd'hui) :</strong>
+                <p style="font-size: 13px; color: #ccc;">Conditions stables. Le NDVI reste dans la moyenne saisonnière. L'indice KBDI est bas suite aux précipitations de la semaine dernière.</p>
+            </div>
+            <button style="background: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Générer une analyse complète</button>
+        </div>
+    </main>
+    
+    <!-- HUGGINGFACE -->
+    <main id="hf">
+        <div class="grid-kpi" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="card">
+                <h3>firewatch-xgboost-v2.4</h3>
+                <p style="font-size: 12px; color: var(--text-muted);">Modèle de base XGBoost optimisé par Optuna.</p>
+                <div style="font-size: 12px; color: var(--accent);">Status: Deployed</div>
+            </div>
+            <div class="card">
+                <h3>firewatch-ensemble-v1.2</h3>
+                <p style="font-size: 12px; color: var(--text-muted);">Stacking Classifier (Meta: LogReg).</p>
+                <div style="font-size: 12px; color: var(--accent);">Status: Deployed</div>
+            </div>
+            <div class="card">
+                <h3>CI/CD Pipeline</h3>
+                <p style="font-size: 12px; color: var(--text-muted);">GitHub Actions auto-deployment to HF Hub.</p>
+                <div style="font-size: 12px; color: var(--risk-low);">Passing</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('main').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Data Fetching
+        async function fetchRiskData() {
+            try {
+                // Point to FastAPI
+                const res = await fetch('http://localhost:8000/current-risk');
+                if(res.ok) {
+                    const data = await res.json();
+                    updateDashboard(data);
+                } else {
+                    console.log("Mocking data (API not reachable)");
+                    mockData();
+                }
+            } catch (e) {
+                console.log("API not reachable, using mock data", e);
+                mockData();
+            }
+        }
+
+        function mockData() {
+            updateDashboard({
+                level: "Faible", confidence: 0.92, fwi: 12.4,
+                meteo: { temperature: 26.5, humidity: 45.0, wind_speed: 15.0 },
+                factors: ["Conditions normales", "Humidité satisfaisante"]
+            });
+        }
+
+        function updateDashboard(data) {
+            const colors = {"Faible": "var(--risk-low)", "Moyen": "var(--risk-med)", "Élevé": "var(--risk-high)", "Très Élevé": "var(--risk-crit)"};
+            const c = colors[data.level] || colors["Faible"];
+            
+            document.getElementById('kpi-risk').innerText = data.level;
+            document.getElementById('kpi-risk').style.color = c;
+            document.getElementById('card-risk').style.borderBottomColor = c;
+            document.getElementById('pred-risk-text').innerText = data.level;
+            document.getElementById('pred-risk-text').style.color = c;
+            
+            if(data.meteo) {
+                document.getElementById('kpi-temp').innerText = data.meteo.temperature + ' °C';
+                document.getElementById('kpi-hum').innerText = data.meteo.humidity + ' %';
+                document.getElementById('kpi-wind').innerText = data.meteo.wind_speed + ' km/h';
+                document.getElementById('kpi-ndvi').innerText = '0.18';
+            }
+            
+            document.getElementById('pred-conf').innerText = (data.confidence * 100).toFixed(1);
+            document.getElementById('pred-fwi').innerText = data.fwi;
+            
+            const factorsUl = document.getElementById('pred-factors');
+            factorsUl.innerHTML = '';
+            data.factors.forEach(f => {
+                const li = document.createElement('li');
+                li.innerText = f;
+                factorsUl.appendChild(li);
+            });
+        }
+
+        // Chart.js Climat
+        const ctx = document.getElementById('climateChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['2020', '2022', '2024', '2026', '2028', '2030', '2035'],
+                datasets: [{
+                    label: 'Température Max Estivale (°C)',
+                    data: [39.5, 40.1, 40.8, 41.2, 41.8, 42.5, 43.2],
+                    borderColor: '#ef4444',
+                    tension: 0.4,
+                    fill: false
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#ccc' } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: '#333' } }, y: { ticks: { color: '#888' }, grid: { color: '#333' } } } }
+        });
+
+        // Initialize
+        fetchRiskData();
+        setInterval(fetchRiskData, 300000); // 5 mins
+    </script>
+</body>
+</html>

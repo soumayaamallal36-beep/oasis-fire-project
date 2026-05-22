@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-05-21T10:16:49.225402",
+  "risque": "Élevé",
+  "priorite": "HAUTE",
+  "confiance": 0.4434,
+  "zone": "Agdez, Drâa-Tafilalet, Maroc",
+  "conditions": {
+    "temperature": 27.7,
+    "humidite": 18,
+    "precipitation": 0.0,
+    "vent": 1.2,
+    "source": "Open-Meteo (temps réel)",
+    "timestamp": "2026-05-21 10:16:35"
+  },
+  "probabilites": {
+    "Faible": 0.03,
+    "Moyen": 0.295,
+    "Élevé": 0.4434375,
+    "Très élevé": 0.2315625
+  },
+  "recommandation": "🟠 Patrouilles terrain actives. Alerter les équipes locales."
+}

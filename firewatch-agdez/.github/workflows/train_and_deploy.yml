@@ -1,0 +1,58 @@
+name: Train and Deploy
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  train-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Tests
+        run: |
+          pytest tests/
+
+      - name: Train Models
+        run: |
+          python src/models/train_all_models.py
+
+      - name: Build Ensemble
+        run: |
+          python src/models/ensemble.py
+
+      - name: Upload to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install -U "huggingface_hub[cli]"
+          huggingface-cli login --token $HF_TOKEN
+          huggingface-cli upload firewatch-agdez/models models/ . --repo-type model
+
+      - name: Create Release Notes
+        if: success()
+        run: |
+          echo "## Model Metrics" > release_notes.md
+          cat models/model_comparison.csv | grep -v 'model,accuracy' >> release_notes.md || true
+
+      - name: Release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v2.4.1-${{ github.run_number }}"
+          body_path: release_notes.md

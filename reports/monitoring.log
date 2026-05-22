@@ -1,0 +1,63 @@
+2026-05-21 12:46:42 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 12:46:47 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 12:46:48 [INFO] 🌡️  Météo → T=31.7°C | H=15% | P=0.0mm | V=4.4m/s
+2026-05-21 12:46:48 [INFO] 🟠 Risque : Élevé (48%) — Random Forest ML
+2026-05-21 12:46:48 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=31.7 H=15 P=0.0 V=4.4
+2026-05-21 12:46:48 [ERROR] ❌ Email : please run connect() first
+2026-05-21 12:46:48 [INFO] 💾 Alerte archivée : alerte_20260521_124647_Élevé.json
+2026-05-21 12:47:01 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 12:47:05 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 12:47:05 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 12:47:05 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 12:47:05 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 12:47:05 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 12:47:05 [ERROR] ❌ Email : please run connect() first
+2026-05-21 12:47:05 [INFO] 💾 Alerte archivée : alerte_20260521_124705_Élevé.json
+2026-05-21 12:47:17 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 12:47:20 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 12:47:20 [INFO] 🔍 Surveillance démarrée (cycle toutes les 30 min)
+2026-05-21 12:47:21 [INFO] 🌡️  Météo → T=31.7°C | H=15% | P=0.0mm | V=4.4m/s
+2026-05-21 12:47:21 [INFO] 🟠 Risque : Élevé (48%) — Random Forest ML
+2026-05-21 12:47:21 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=31.7 H=15 P=0.0 V=4.4
+2026-05-21 12:47:21 [ERROR] ❌ Email : please run connect() first
+2026-05-21 12:47:21 [INFO] 💾 Alerte archivée : alerte_20260521_124720_Élevé.json
+2026-05-21 12:50:16 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 12:50:23 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 12:50:23 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 12:50:23 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 12:50:23 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 12:50:23 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 12:50:23 [ERROR] ❌ SMTP : please run connect() first
+2026-05-21 12:50:23 [INFO] 💾 Alerte archivée : alerte_20260521_125023_Élevé.json
+2026-05-21 13:01:00 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 13:01:03 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 13:01:03 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 13:01:03 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 13:01:03 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 13:01:03 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 13:01:03 [ERROR] ❌ SMTP : please run connect() first
+2026-05-21 13:01:03 [INFO] 💾 Alerte archivée : alerte_20260521_130103_Élevé.json
+2026-05-21 13:08:03 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 13:08:06 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 13:08:06 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 13:08:06 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 13:08:06 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 13:08:06 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 13:08:07 [ERROR] ❌ SMTP : please run connect() first
+2026-05-21 13:08:07 [INFO] 💾 Alerte archivée : alerte_20260521_130806_Élevé.json
+2026-05-21 13:14:25 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 13:14:28 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 13:14:28 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 13:14:28 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 13:14:28 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 13:14:28 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 13:14:29 [ERROR] ❌ Authentification échouée — utilisez un mot de passe d'application Gmail (16 caractères)
+2026-05-21 13:14:29 [INFO] 💾 Alerte archivée : alerte_20260521_131428_Élevé.json
+2026-05-21 16:05:24 [INFO] ✅ Configuration chargée depuis C:\Users\hp\Desktop\oasis_fire_project\config_alertes.json
+2026-05-21 16:05:30 [INFO] ✅ Modèle Random Forest chargé
+2026-05-21 16:05:30 [INFO] 🔬 SIMULATION — conditions extrêmes injectées
+2026-05-21 16:05:30 [INFO] 🌡️  Météo → T=38.0°C | H=8.0% | P=0.0mm | V=6.5m/s
+2026-05-21 16:05:31 [INFO] 🟠 Risque : Élevé (45%) — Random Forest ML
+2026-05-21 16:05:31 [WARNING] 🚨 ALERTE HAUTE — Élevé | T=38.0 H=8.0 P=0.0 V=6.5
+2026-05-21 16:05:31 [ERROR] ❌ Connexion réseau : [Errno 11001] getaddrinfo failed
+2026-05-21 16:05:31 [INFO] 💾 Alerte archivée : alerte_20260521_160530_Élevé.json

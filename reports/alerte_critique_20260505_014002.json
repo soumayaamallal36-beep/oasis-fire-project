@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-05T01:40:02.995945",
+  "zone": "Agdez",
+  "pays": "Maroc",
+  "scenario": "Sécheresse août 2026 (Prec<1mm)",
+  "risque": "Très élevé",
+  "confiance": 0.5116,
+  "priorite": "CRITIQUE",
+  "message": "DANGER IMMÉDIAT — activation du plan ORSEC forêt",
+  "probas": {}
+}

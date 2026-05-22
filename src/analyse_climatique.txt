@@ -1,0 +1,256 @@
+# ============================================
+# ANALYSE DES DONNÉES CLIMATIQUES
+# Même structure que l'analyse des images satellites
+# ============================================
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from google.colab import files
+import numpy as np
+
+print("=" * 60)
+print("🌡️ ANALYSE DES DONNÉES CLIMATIQUES")
+print("=" * 60)
+
+# ============================================
+# DONNÉES BRUTES (NASA POWER)
+# ============================================
+
+# Données annuelles 2017-2025
+data_annuelle = {
+    'Année': [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+    'Température_°C': [20.43, 19.16, 20.34, 20.46, 20.50, 20.76, 21.07, 21.23, 20.25],
+    'Humidité_%': [28.56, 35.43, 28.96, 32.07, 30.87, 31.23, 29.22, 29.64, 31.98],
+    'Précipitations_mm': [45.43, 103.64, 111.66, 108.69, 75.10, 82.65, 93.92, 70.68, 109.69],
+    'Vent_m_s': [3.88, 4.17, 3.85, 3.90, 4.06, 3.92, 3.78, 3.88, 3.86]
+}
+
+# Données été 2025
+data_ete = {
+    'Mois': ['Juin', 'Juillet', 'Août'],
+    'Température_°C': [29.30, 32.69, 31.40],
+    'Humidité_%': [20.18, 16.42, 19.86],
+    'Précipitations_mm': [2.85, 26.43, 0.18],
+    'Vent_m_s': [4.50, 4.01, 3.81]
+}
+
+# Convertir en DataFrame
+df_annuel = pd.DataFrame(data_annuelle)
+df_ete = pd.DataFrame(data_ete)
+
+print("\n✅ Données chargées")
+
+# ============================================
+# 1. TABLEAUX POUR LE RAPPORT (comme les satellites)
+# ============================================
+
+print("\n" + "=" * 60)
+print("📊 TABLEAU 1: Statistiques climatiques annuelles (2017-2025)")
+print("=" * 60)
+
+stats_annuelles = pd.DataFrame({
+    'Statistique': ['Température minimale', 'Température maximale', 
+                    'Température moyenne', 'Humidité moyenne',
+                    'Précipitations totales', 'Vent moyen'],
+    'Valeur': [
+        f"{df_annuel['Température_°C'].min():.2f} °C (201{df_annuel[df_annuel['Température_°C'] == df_annuel['Température_°C'].min()]['Année'].values[0]})",
+        f"{df_annuel['Température_°C'].max():.2f} °C (201{df_annuel[df_annuel['Température_°C'] == df_annuel['Température_°C'].max()]['Année'].values[0]})",
+        f"{df_annuel['Température_°C'].mean():.2f} °C",
+        f"{df_annuel['Humidité_%'].mean():.2f} %",
+        f"{df_annuel['Précipitations_mm'].sum():.2f} mm",
+        f"{df_annuel['Vent_m_s'].mean():.2f} m/s"
+    ]
+})
+print(stats_annuelles.to_string(index=False))
+
+print("\n" + "=" * 60)
+print("🔥 TABLEAU 2: Conditions climatiques été 2025")
+print("=" * 60)
+print(df_ete.to_string(index=False))
+
+print("\n" + "=" * 60)
+print("📊 TABLEAU 3: Récapitulatif climat - incendie")
+print("=" * 60)
+
+recap = pd.DataFrame({
+    'Facteur': ['Température max (juillet)', 'Humidité min (juillet)', 
+                'Vent max (juin)', 'Précipitations (juillet)',
+                'Surface brûlée', 'dNBR max'],
+    'Valeur': ['32.69 °C', '16.42 %', '4.50 m/s', '26.43 mm', '388.51 ha', '0.5928'],
+    'Impact': ['🔴 Très haut', '🔴 Favorise le feu', '🟠 Propagation', '🟢 Exceptionnel', '🔥 Important', '🔥 Sévère']
+})
+print(recap.to_string(index=False))
+
+# ============================================
+# 2. GRAPHIQUES (comme pour les satellites)
+# ============================================
+
+print("\n📊 Génération des graphiques...")
+
+# Graphique 1: Évolution de la température (2017-2025)
+plt.figure(figsize=(12, 6))
+plt.plot(df_annuel['Année'], df_annuel['Température_°C'], 'o-', color='red', linewidth=2, markersize=8)
+plt.xlabel('Année')
+plt.ylabel('Température (°C)')
+plt.title('Évolution de la température moyenne - Agdez (2017-2025)')
+plt.grid(True, alpha=0.3)
+for _, row in df_annuel.iterrows():
+    plt.text(row['Année'], row['Température_°C'] + 0.15, str(row['Température_°C']), ha='center', fontsize=9)
+plt.tight_layout()
+plt.savefig('graphique_evolution_temperature.png', dpi=300)
+plt.show()
+print("   ✅ graphique_evolution_temperature.png")
+
+# Graphique 2: Températures été 2025
+plt.figure(figsize=(8, 6))
+bars = plt.bar(df_ete['Mois'], df_ete['Température_°C'], color=['#ff9999', '#ff3333', '#ff9999'])
+plt.axhline(y=df_ete['Température_°C'].mean(), color='blue', linestyle='--', label=f"Moyenne: {df_ete['Température_°C'].mean():.1f}°C")
+plt.xlabel('Mois')
+plt.ylabel('Température (°C)')
+plt.title('Températures été 2025 - Agdez')
+plt.legend()
+for bar, temp in zip(bars, df_ete['Température_°C']):
+    plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3, f'{temp}°C', ha='center')
+plt.tight_layout()
+plt.savefig('graphique_temperatures_ete.png', dpi=300)
+plt.show()
+print("   ✅ graphique_temperatures_ete.png")
+
+# Graphique 3: Comparaison été / moyenne annuelle
+plt.figure(figsize=(10, 6))
+moyenne_annuelle = df_annuel['Température_°C'].mean()
+plt.bar(['Moyenne annuelle', 'Juin', 'Juillet', 'Août'], 
+        [moyenne_annuelle, df_ete['Température_°C'][0], df_ete['Température_°C'][1], df_ete['Température_°C'][2]],
+        color=['blue', 'orange', 'red', 'orange'])
+plt.ylabel('Température (°C)')
+plt.title('Comparaison été 2025 vs moyenne annuelle (2017-2025)')
+for i, v in enumerate([moyenne_annuelle, df_ete['Température_°C'][0], df_ete['Température_°C'][1], df_ete['Température_°C'][2]]):
+    plt.text(i, v + 0.5, f'{v:.1f}°C', ha='center')
+plt.tight_layout()
+plt.savefig('graphique_comparaison_ete_moyenne.png', dpi=300)
+plt.show()
+print("   ✅ graphique_comparaison_ete_moyenne.png")
+
+# ============================================
+# 3. STATISTIQUES DÉTAILLÉES (CSV pour Dashboard et Prédiction)
+# ============================================
+
+print("\n💾 Sauvegarde des fichiers CSV...")
+
+# Pour le Dashboard
+df_annuel.to_csv('climat_statistiques_annuelles.csv', index=False)
+df_ete.to_csv('climat_conditions_ete_2025.csv', index=False)
+stats_annuelles.to_csv('climat_stats_recap.csv', index=False)
+recap.to_csv('climat_recap_incendie.csv', index=False)
+
+# Pour la Prédiction (données d'entrée du modèle)
+prediction_data = df_ete.copy()
+prediction_data['Risque'] = ['Moyen', 'Très élevé', 'Élevé']
+prediction_data.to_csv('climat_donnees_prediction.csv', index=False)
+
+print("   ✅ climat_statistiques_annuelles.csv")
+print("   ✅ climat_conditions_ete_2025.csv")
+print("   ✅ climat_stats_recap.csv")
+print("   ✅ climat_recap_incendie.csv")
+print("   ✅ climat_donnees_prediction.csv")
+
+# ============================================
+# 4. TABLEAUX EN IMAGE (comme pour les satellites)
+# ============================================
+
+print("\n📋 Création des tableaux en images...")
+
+def create_table_image(data, title, filename, col_widths=None):
+    fig, ax = plt.subplots(figsize=(12, len(data)*0.5))
+    ax.axis('tight')
+    ax.axis('off')
+    table = ax.table(cellText=data, loc='center', cellLoc='center', colWidths=col_widths)
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.5)
+    for i in range(len(data[0])):
+        table[(0, i)].set_facecolor('#4472C4')
+        table[(0, i)].set_text_props(weight='bold', color='white')
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"   ✅ {filename}")
+
+# Tableau 1: Statistiques annuelles
+data1 = [['Statistique', 'Valeur']] + [[row['Statistique'], row['Valeur']] for _, row in stats_annuelles.iterrows()]
+create_table_image(data1, "Statistiques climatiques (2017-2025)", "tableau_statistiques_climat.png", [0.5, 0.5])
+
+# Tableau 2: Conditions été 2025
+data2 = [['Mois', 'Température (°C)', 'Humidité (%)', 'Précipitations (mm)', 'Vent (m/s)']] + \
+        [[row['Mois'], f"{row['Température_°C']:.2f}", f"{row['Humidité_%']:.2f}", 
+          f"{row['Précipitations_mm']:.2f}", f"{row['Vent_m_s']:.2f}"] for _, row in df_ete.iterrows()]
+create_table_image(data2, "Conditions climatiques été 2025", "tableau_climat_ete.png", [0.2, 0.2, 0.2, 0.2, 0.2])
+
+# Tableau 3: Récapitulatif incendie
+data3 = [['Facteur', 'Valeur', 'Impact']] + [[row['Facteur'], row['Valeur'], row['Impact']] for _, row in recap.iterrows()]
+create_table_image(data3, "Récapitulatif climat - incendie", "tableau_recap_climat.png", [0.4, 0.3, 0.3])
+
+# ============================================
+# 5. RÉSUMÉ DES FICHIERS PRODUITS
+# ============================================
+print("\n" + "=" * 60)
+print("📁 FICHIERS PRODUITS - ANALYSE CLIMATIQUE")
+print("=" * 60)
+
+print("""
+📊 CSV (5 fichiers):
+   - climat_statistiques_annuelles.csv  → Pour Dashboard
+   - climat_conditions_ete_2025.csv     → Pour Dashboard
+   - climat_stats_recap.csv              → Pour Rapport
+   - climat_recap_incendie.csv          → Pour Rapport
+   - climat_donnees_prediction.csv      → 🔥 Pour PRÉDICTION
+
+🖼️ GRAPHIQUES (3 fichiers):
+   - graphique_evolution_temperature.png
+   - graphique_temperatures_ete.png
+   - graphique_comparaison_ete_moyenne.png
+
+📋 TABLEAUX (3 fichiers):
+   - tableau_statistiques_climat.png
+   - tableau_climat_ete.png
+   - tableau_recap_climat.png
+""")
+
+# ============================================
+# 6. TÉLÉCHARGEMENT
+# ============================================
+print("\n📥 Téléchargement des fichiers...")
+
+files.download('climat_statistiques_annuelles.csv')
+files.download('climat_conditions_ete_2025.csv')
+files.download('climat_stats_recap.csv')
+files.download('climat_recap_incendie.csv')
+files.download('climat_donnees_prediction.csv')
+files.download('graphique_evolution_temperature.png')
+files.download('graphique_temperatures_ete.png')
+files.download('graphique_comparaison_ete_moyenne.png')
+files.download('tableau_statistiques_climat.png')
+files.download('tableau_climat_ete.png')
+files.download('tableau_recap_climat.png')
+
+print("\n" + "=" * 60)
+print("✅ ANALYSE CLIMATIQUE TERMINÉE!")
+print("=" * 60)
+print("\n🎯 RÉCAPITULATIF DES SORTIES:")
+
+print("""
+┌─────────────────────────────────────────────────────────────────────┐
+│  POUR LE RAPPORT:                                                   │
+│  ├── 3 tableaux PNG (statistiques, été 2025, récapitulatif)        │
+│  ├── 3 graphiques PNG (évolution, été, comparaison)                │
+│  └── 3 CSV (stats, conditions, récap)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  POUR LE DASHBOARD:                                                 │
+│  ├── climat_statistiques_annuelles.csv                             │
+│  └── climat_conditions_ete_2025.csv                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  🔥 POUR LA PRÉDICTION:                                             │
+│  └── climat_donnees_prediction.csv  ← à utiliser dans le modèle    │
+└─────────────────────────────────────────────────────────────────────┘
+""")

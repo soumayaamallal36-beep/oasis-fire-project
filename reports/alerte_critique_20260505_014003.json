@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-05T01:40:03.018755",
+  "zone": "Agdez",
+  "pays": "Maroc",
+  "scenario": "Août 2026 + réchauffement +2°C",
+  "risque": "Très élevé",
+  "confiance": 0.5566,
+  "priorite": "CRITIQUE",
+  "message": "DANGER IMMÉDIAT — activation du plan ORSEC forêt",
+  "probas": {}
+}

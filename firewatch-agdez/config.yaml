@@ -1,0 +1,243 @@
+# ============================================================
+# FireWatch Agdez - Configuration Principale
+# Plateforme IA de prédiction d'incendies - Drâa-Tafilalet
+# ============================================================
+
+# --- Coordonnées GPS ---
+location:
+  name: "Agdez"
+  region: "Drâa-Tafilalet"
+  country: "Maroc"
+  latitude: 30.6936
+  longitude: -6.4497
+  elevation_m: 1050
+  timezone: "Africa/Casablanca"
+
+# --- Seuils de risque ---
+risk_thresholds:
+  temperature:
+    low: 25.0
+    medium: 30.0
+    high: 35.0
+    critical: 40.0
+  humidity:
+    critical: 10.0
+    high: 20.0
+    medium: 35.0
+    low: 50.0
+  wind_speed:
+    low: 10.0
+    medium: 20.0
+    high: 25.0
+    critical: 35.0
+  fwi:
+    low: 5.0
+    medium: 15.0
+    high: 25.0
+    critical: 40.0
+  ndvi:
+    very_low: 0.1
+    low: 0.15
+    medium: 0.25
+    high: 0.4
+
+# --- Niveaux de risque ---
+risk_levels:
+  0: "Faible"
+  1: "Moyen"
+  2: "Élevé"
+  3: "Très Élevé"
+
+risk_colors:
+  "Faible": "#22c55e"
+  "Moyen": "#f59e0b"
+  "Élevé": "#ef4444"
+  "Très Élevé": "#dc2626"
+
+# --- APIs ---
+apis:
+  open_meteo:
+    base_url: "https://api.open-meteo.com/v1/forecast"
+    historical_url: "https://archive-api.open-meteo.com/v1/archive"
+    timeout: 30
+    retry_attempts: 3
+    retry_delay: 2
+  nasa_firms:
+    base_url: "https://firms.modaps.eosdis.nasa.gov/api"
+    map_key: "${FIRMS_MAP_KEY}"
+    source: "VIIRS_SNPP_NRT"
+    radius_km: 50
+  huggingface:
+    repo_id: "firewatch-agdez/models"
+    token: "${HF_TOKEN}"
+  sentinel:
+    base_url: "https://scihub.copernicus.eu/dhus"
+    username: "${SENTINEL_USER}"
+    password: "${SENTINEL_PASS}"
+
+# --- Modèles ML ---
+models:
+  xgboost:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    eval_metric: "mlogloss"
+  lightgbm:
+    n_estimators: 300
+    num_leaves: 63
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_samples: 20
+  random_forest:
+    n_estimators: 300
+    max_depth: 8
+    min_samples_split: 5
+    min_samples_leaf: 2
+    class_weight: "balanced"
+  catboost:
+    iterations: 300
+    depth: 6
+    learning_rate: 0.05
+    verbose: 0
+    loss_function: "MultiClass"
+  extra_trees:
+    n_estimators: 300
+    max_depth: 8
+    min_samples_split: 5
+    min_samples_leaf: 2
+    class_weight: "balanced"
+  gradient_boosting:
+    n_estimators: 300
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+    min_samples_split: 5
+
+# --- Ensemble ---
+ensemble:
+  voting_type: "soft"
+  stacking_cv: 5
+  stacking_passthrough: true
+  final_estimator: "LogisticRegression"
+  final_estimator_params:
+    max_iter: 1000
+    C: 1.0
+
+# --- Optuna ---
+optuna:
+  n_trials: 200
+  cv_folds: 5
+  scoring: "f1_weighted"
+  sampler: "TPESampler"
+  pruner:
+    type: "MedianPruner"
+    n_startup_trials: 5
+    n_warmup_steps: 10
+  search_space:
+    n_estimators: [100, 500]
+    max_depth: [3, 9]
+    learning_rate: [0.01, 0.3]
+    subsample: [0.6, 1.0]
+    colsample_bytree: [0.6, 1.0]
+    min_child_weight: [1, 10]
+
+# --- Features ---
+features:
+  target_column: "fire_risk_level"
+  feature_columns:
+    - temperature
+    - humidity
+    - wind_speed
+    - precipitation
+    - ndvi
+    - fwi
+    - kbdi
+    - spi_3m
+    - season
+    - elevation
+    - slope
+    - aspect
+    - distance_to_forest
+    - previous_fires_3y
+    - drought_index
+  test_size: 0.2
+  random_state: 42
+
+# --- Chemins fichiers ---
+paths:
+  data:
+    raw: "data/raw"
+    processed: "data/processed"
+    historical: "data/historical"
+  models: "models"
+  mlruns: "mlruns"
+  database: "data/predictions.db"
+  logs: "logs"
+
+# --- Alertes ---
+alerts:
+  email:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    sender: "${EMAIL_SENDER}"
+    password: "${EMAIL_PASSWORD}"
+    recipients:
+      - "admin@firewatch-agdez.ma"
+    cooldown_hours: 4
+    cooldown_file: ".last_email_alert"
+  slack:
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#firewatch-alerts"
+    cooldown_hours: 4
+    cooldown_file: ".last_slack_alert"
+
+# --- API FastAPI ---
+api:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins:
+    - "http://localhost:*"
+    - "http://127.0.0.1:*"
+    - "https://firewatch-agdez.ma"
+  model_version: "2.4.1"
+
+# --- MLflow ---
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "firewatch-agdez"
+  registry_uri: "sqlite:///mlruns/mlflow.db"
+
+# --- Données synthétiques ---
+synthetic_data:
+  n_samples: 5000
+  random_state: 42
+  seasons:
+    summer:
+      months: [6, 7, 8]
+      temp_range: [35, 45]
+      humidity_range: [5, 20]
+      wind_range: [15, 40]
+      risk_high_pct: 0.70
+    spring:
+      months: [3, 4, 5]
+      temp_range: [25, 38]
+      humidity_range: [20, 45]
+      wind_range: [10, 30]
+      risk_medium_pct: 0.40
+    autumn:
+      months: [9, 10, 11]
+      temp_range: [20, 35]
+      humidity_range: [25, 50]
+      wind_range: [10, 25]
+      risk_medium_pct: 0.30
+    winter:
+      months: [12, 1, 2]
+      temp_range: [5, 20]
+      humidity_range: [40, 70]
+      wind_range: [5, 20]
+      risk_low_pct: 0.10
+  noise_std_pct: 0.05

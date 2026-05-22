@@ -1,0 +1,3 @@
+timestamp,temperature,humidite,precipitation,vent,risk_predicted,confidence,prob_faible,prob_moyen,prob_eleve,prob_tres_eleve
+2026-05-11T11:51:55.744431,27.1,19,0.0,29.8,Moyen,0.5125,0.0,0.5125,0.3275,0.16
+2026-05-12T13:24:39.836519,28.9,16,0.0,4.0,Élevé,0.59,0.0,0.16,0.59,0.25
