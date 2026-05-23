@@ -653,7 +653,7 @@ def fetch_meteo_realtime() -> dict | None:
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
-        model = joblib.load(MDL / "best_model.pkl")
+        model = joblib.load("best_model.pkl")
        
         return model, None
     except FileNotFoundError as e:
