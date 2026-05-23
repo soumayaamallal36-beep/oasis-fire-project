@@ -1307,9 +1307,50 @@ def sidebar(meteo_rt):
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 # ============================================================================
 def main():
+    # Load realtime monitoring data
+    try:
+        with open("data/meteo_daily/live_data.json", "r") as f:
+            live_data = json.load(f)
+
+    except:
+        live_data = None
+
     model, le = load_model()
     D         = load_data()
     meteo_rt  = fetch_meteo_realtime()
+    # ===============================
+    # REALTIME MONITORING
+# ===============================
+
+    st.subheader("🔥 Realtime Fire Monitoring")
+    if live_data:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "🌡 Temperature",
+               f"{live_data.get('temperature', 0)} °C"
+            )
+        with col2:
+            st.metric(
+                "💧 Humidity",
+              f"{live_data.get('humidity', 0)} %"
+            )
+        with col3:
+            st.metric(
+                "💨 Wind",
+                f"{live_data.get('wind', 0)} km/h"
+            )
+        with col4:
+            st.metric(
+                "🔥 AI Risk",
+              live_data.get('risk', 'Unknown')
+          )
+    
+
+    else:
+        
+        st.warning("No realtime monitoring data")
 
     # ── Gestionnaire d'alertes ────────────────────────────────────────────────
     cfg_alertes = ConfigAlertes()

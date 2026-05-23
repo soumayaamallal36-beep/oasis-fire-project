@@ -66,6 +66,23 @@ while True:
             risk = "Faible"
 
         print(f"\n🔥 AI Current Risk: {risk}")
+        # =========================
+         # SAVE LIVE DATA
+        # =========================
+        live_data = {
+            "temperature": temperature,
+            "humidity": humidity,
+            "precipitation": precipitation,
+            "wind_speed": wind_speed,
+            "risk": risk
+        }
+        with open(
+             "data/live_predictions.json",
+             "w"
+        ) as f:
+            json.dump(live_data, f, indent=4)
+            print("✅ Live data updated")
+
 
         # =========================
         # EMAIL ALERT
@@ -101,5 +118,15 @@ while True:
     # =========================
     # WAIT 5 MINUTES
     # =========================
+    # Save live prediction for dashboard
+    live_data = {
+        "temperature": temperature,
+        "humidity": humidity,
+        "wind": wind_speed,
+        "risk": risk
+        }
+    with open("data/live_predictions.json", "w") as f:
+        json.dump(live_data, f)
 
+    print("✅ Live data updated")
     time.sleep(300)
