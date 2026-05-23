@@ -604,7 +604,7 @@ def ml_predict(model, le, t, h, p, v, mois_num=1, ndvi=0.144):
     X = build_X(t, h, p, v, mois_num, ndvi)
     y      = model.predict(X)[0]
     probas = model.predict_proba(X)[0]
-    label  = le.inverse_transform([y])[0]
+    label = str(y)
     return label, float(probas.max()), {c: float(pb) for c, pb in zip(le.classes_, probas)}
 
 def recommendation(risque: str) -> str:
@@ -653,9 +653,9 @@ def fetch_meteo_realtime() -> dict | None:
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
-        model = joblib.load(MDL / "model_risque_incendie.pkl")
-        le    = joblib.load(MDL / "label_encoder.pkl")
-        return model, le
+        model = joblib.load(MDL / "best_model.pkl")
+       
+        return model, None
     except FileNotFoundError as e:
         st.error(f"❌ Modèle introuvable : {e}")
         st.stop()
