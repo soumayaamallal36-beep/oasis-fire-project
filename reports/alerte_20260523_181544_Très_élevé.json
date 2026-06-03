@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-23 18:15:41",
+  "priorite": "CRITIQUE",
+  "risque": "Très élevé",
+  "confiance": 0.875,
+  "zone": "Agdez, Drâa-Tafilalet, Maroc",
+  "scenario": "Juillet 2026",
+  "mois": "Juillet",
+  "annee": 2026,
+  "conditions": {
+    "temperature": 34.1,
+    "humidite": 8.0,
+    "precipitation": 0.0,
+    "vent": 2.0
+  },
+  "probabilites": {
+    "Faible": 0.0,
+    "Moyen": 0.075,
+    "Élevé": 0.05,
+    "Très élevé": 0.875
+  },
+  "recommandation": "🔴 DANGER — Activer plan ORSEC. Interdire accès zones boisées."
+}

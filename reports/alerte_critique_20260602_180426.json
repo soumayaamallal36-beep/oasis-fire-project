@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-06-02T18:04:26.776507",
+  "zone": "Agdez",
+  "pays": "Maroc",
+  "scenario": "Juillet 2026 — Simulation centre opérationnel",
+  "risque": "Très élevé",
+  "confiance": 0.445,
+  "priorite": "CRITIQUE",
+  "message": "DANGER IMMÉDIAT — activation du plan ORSEC forêt",
+  "probas": {
+    "Faible": 0.0,
+    "Moyen": 0.17,
+    "Élevé": 0.385,
+    "Très élevé": 0.445
+  }
+}

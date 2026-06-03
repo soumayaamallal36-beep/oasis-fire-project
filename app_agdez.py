@@ -43,7 +43,7 @@ BASE     = Path(__file__).parent
 MDL      = BASE / "models" / "trained"
 META     = BASE / "models" / "metadata"
 CSV      = BASE / "data" / "csv" / "climat"
-INCENDIE = BASE / "data" / "csv" / "incendie"
+INCENDIE = BASE / "dashboard" / "data_" / "satellite _image"
 RPT      = BASE / "reports"
 
 # ── Constantes Agdez ─────────────────────────────────────────────────────────
@@ -260,9 +260,25 @@ html, body, [class*="css"]{
 
 /* DATAFRAMES */
 [data-testid="stDataFrame"]{
-    border-radius:14px;
+    border-radius:10px;
     overflow:hidden;
-    border:1px solid #e2e8f0;
+    border:1px solid #2a3a5c;
+}
+[data-testid="stDataFrame"] table td,
+[data-testid="stDataFrame"] table th{
+    color:#e2e8f0 !important;
+    font-size:0.78rem;
+}
+[data-testid="stDataFrame"] table th{
+    background:#0d1a2d !important;
+    color:#f8fafc !important;
+    font-weight:700;
+}
+[data-testid="stDataFrame"] table td{
+    background:#0a1628 !important;
+}
+[data-testid="stDataFrame"] table tr:nth-child(even) td{
+    background:#0f1f35 !important;
 }
 
 /* BUTTONS */
@@ -535,7 +551,7 @@ def envoyer_alerte(cfg: ConfigAlertes, risque: str, confiance: float,
         "recommandation": recommandation,
     }
 
-    resultats = {"email": None, "webhook": None, "json": None}
+    resultats = {}
 
     if cfg.email_actif and not cfg.erreurs():
         resultats["email"] = _envoyer_email(cfg, payload)
@@ -552,10 +568,6 @@ def envoyer_alerte(cfg: ConfigAlertes, risque: str, confiance: float,
 # ============================================================================
 # ── Helpers ──────────────────────────────────────────────────────────────────
 # ============================================================================
-
-def hex2rgba(h: str, a: float = 0.15) -> str:
-    h = h.lstrip("#")
-    return f"rgba({int(h[:2],16)},{int(h[2:4],16)},{int(h[4:],16)},{a})"
 
 def read_csv(path: Path) -> pd.DataFrame | None:
     for enc in ["utf-8","latin-1","cp1252"]:
@@ -604,8 +616,8 @@ def ml_predict(model, le, t, h, p, v, mois_num=1, ndvi=0.144):
     X = build_X(t, h, p, v, mois_num, ndvi)
     y      = model.predict(X)[0]
     probas = model.predict_proba(X)[0]
-    label = str(y)
-    return label, float(probas.max()), {c: float(pb) for c, pb in zip(le.classes_, probas)}
+    label  = str(le.inverse_transform([y])[0])
+    return label, float(probas.max()), {str(c): float(pb) for c, pb in zip(le.classes_, probas)}
 
 def recommendation(risque: str) -> str:
     return {
@@ -653,9 +665,9 @@ def fetch_meteo_realtime() -> dict | None:
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
-        model = joblib.load("best_model.pkl")
-       
-        return model, None
+        model = joblib.load("models/trained/model_risque_incendie.pkl")
+        le    = joblib.load("models/trained/label_encoder.pkl")
+        return model, le
     except FileNotFoundError as e:
         st.error(f"❌ Modèle introuvable : {e}")
         st.stop()
@@ -677,9 +689,10 @@ def load_data():
                     for f in sorted(glob.glob(str(RPT / "alerte_*.json")))]
     return d
 
-# ============================================================================
-# ── Graphiques Plotly (toutes données réelles) ───────────────────────────────
-# ============================================================================
+def hex2rgba(h: str, a: float = 0.15) -> str:
+    h = h.lstrip("#")
+    return f"rgba({int(h[:2],16)},{int(h[2:4],16)},{int(h[4:],16)},{a})"
+
 DARK = dict(
     template="plotly_dark",
     paper_bgcolor="#0d0d1a",
@@ -692,70 +705,60 @@ C = dict(rouge="#d62828", orange="#f77f00", bleu="#3498db",
          vert="#27ae60", violet="#a855f7", cyan="#06b6d4")
 RP = {"Faible":"#27ae60","Moyen":"#e67e22","Élevé":"#e74c3c","Très élevé":"#8e1a1a"}
 
+def fig_proba_gauge(probas: dict, risque: str):
+    val = probas.get(risque, 0) * 100
+    col = RISQUE_COLOR.get(risque, "#888")
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=val,
+        title={"text": f"P({risque})", "font": {"size": 12}},
+        number={"suffix": "%", "font": {"size": 25}},
+        gauge={
+            "axis": {"range": [0,100], "tickcolor":"#555"},
+            "bar":  {"color": col, "thickness": 0.75},
+            "bgcolor": "#111",
+            "steps": [{"range":[0,25],"color":"#1a1a1a"},{"range":[25,50],"color":"#1f1a10"},
+                      {"range":[50,75],"color":"#2a1010"},{"range":[75,100],"color":"#3d0000"}],
+            "threshold": {"line": {"color": col, "width": 4}, "value": val},
+        },
+    ))
+    fig.update_layout(paper_bgcolor="#0d0d1a", font_family="Syne",
+                      font_color="#e2e8f0",
+                      margin=dict(t=50,b=10,l=20,r=20), height=200)
+    return fig
+
+
 def fig_temp_humidity_full(df_proj):
     """Température + humidité 2017–2035 (historique + projections)."""
-    # Historique 2017-2025
     annees_h = list(HIST.keys())
     temps_h  = [HIST[a]["temperature"] for a in annees_h]
     hum_h    = [HIST[a]["humidite"]    for a in annees_h]
-    # Projections 2026-2035
     annees_p = df_proj["annee"].tolist()
     temps_p  = df_proj["temperature"].tolist()
     hum_p    = df_proj["humidite"].tolist()
-
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-    # Historique température
-    fig.add_trace(go.Scatter(
-        x=annees_h, y=temps_h, name="T° historique",
-        mode="lines+markers",
-        line=dict(color=C["rouge"], width=3),
-        marker=dict(size=9),
-        text=[f"{v:.2f}°C" for v in temps_h],
-        textposition="top center", textfont=dict(size=8.5),
-    ), secondary_y=False)
-
-    # Projections température
-    fig.add_trace(go.Scatter(
-        x=[annees_h[-1]] + annees_p,
-        y=[temps_h[-1]]  + temps_p,
-        name="T° projetée",
-        mode="lines+markers",
+    fig.add_trace(go.Scatter(x=annees_h, y=temps_h, name="T° historique",
+        mode="lines+markers", line=dict(color=C["rouge"], width=3),
+        marker=dict(size=9), text=[f"{v:.2f}°C" for v in temps_h],
+        textposition="top center", textfont=dict(size=8.5)), secondary_y=False)
+    fig.add_trace(go.Scatter(x=[annees_h[-1]]+annees_p, y=[temps_h[-1]]+temps_p,
+        name="T° projetée", mode="lines+markers",
         line=dict(color=C["rouge"], width=2.5, dash="dash"),
         marker=dict(size=8, symbol="diamond"),
-        text=[""] + [f"{v:.1f}°C" for v in temps_p],
-        textposition="top center", textfont=dict(size=8),
-    ), secondary_y=False)
-
-    # Humidité historique
-    fig.add_trace(go.Scatter(
-        x=annees_h, y=hum_h, name="H% historique",
-        mode="lines+markers",
-        line=dict(color=C["bleu"], width=2),
-        marker=dict(size=7),
-    ), secondary_y=True)
-
-    # Humidité projetée
-    fig.add_trace(go.Scatter(
-        x=[annees_h[-1]] + annees_p,
-        y=[hum_h[-1]]    + hum_p,
-        name="H% projetée",
-        mode="lines",
-        line=dict(color=C["bleu"], width=1.8, dash="dot"),
-    ), secondary_y=True)
-
-    # Zone de séparation historique/projection
-    fig.add_vrect(x0=2025.5, x1=2035.5,
-                  fillcolor="rgba(255,100,0,0.05)",
+        text=[""]+[f"{v:.1f}°C" for v in temps_p],
+        textposition="top center", textfont=dict(size=8)), secondary_y=False)
+    fig.add_trace(go.Scatter(x=annees_h, y=hum_h, name="H% historique",
+        mode="lines+markers", line=dict(color=C["bleu"], width=2),
+        marker=dict(size=7)), secondary_y=True)
+    fig.add_trace(go.Scatter(x=[annees_h[-1]]+annees_p, y=[hum_h[-1]]+hum_p,
+        name="H% projetée", mode="lines",
+        line=dict(color=C["bleu"], width=1.8, dash="dot")), secondary_y=True)
+    fig.add_vrect(x0=2025.5, x1=2035.5, fillcolor="rgba(255,100,0,0.05)",
                   layer="below", line_width=0,
-                  annotation_text="Projections →",
-                  annotation_position="top left",
+                  annotation_text="Projections →", annotation_position="top left",
                   annotation_font_color="#f77f00")
-
-    fig.update_layout(
-        title="Évolution climatique 2017–2035 (historique + projections CC)", **DARK,
-        legend=dict(orientation="h", y=1.12),
-    )
+    fig.update_layout(title="Évolution climatique 2017–2035", **DARK,
+                      legend=dict(orientation="h", y=1.12))
     fig.update_yaxes(title_text="Température (°C)", secondary_y=False, color=C["rouge"])
     fig.update_yaxes(title_text="Humidité (%)", secondary_y=True, color=C["bleu"])
     return fig
@@ -765,18 +768,14 @@ def fig_anomalies():
     """Anomalies de température estivale (référence 2017-2024)."""
     annees = list(HIST.keys())
     temps  = [HIST[a]["temperature"] for a in annees]
-    ref    = np.mean(temps[:-1])  # référence sans 2025
+    ref    = np.mean(temps[:-1])
     anom   = [t - ref for t in temps]
     colors = [C["rouge"] if a >= 0 else "#3498db" for a in anom]
-    fig = go.Figure(go.Bar(
-        x=annees, y=anom, marker_color=colors,
-        text=[f"{a:+.2f}°C" for a in anom], textposition="outside",
-    ))
+    fig = go.Figure(go.Bar(x=annees, y=anom, marker_color=colors,
+                           text=[f"{a:+.2f}°C" for a in anom], textposition="outside"))
     fig.add_hline(y=0, line_color="white", line_width=1.5)
-    fig.update_layout(
-        title=f"Anomalies T° estivale (référence 2017-2024 · moy={ref:.2f}°C)",
-        yaxis_title="Écart (°C)", **DARK,
-    )
+    fig.update_layout(title=f"Anomalies T° estivale (réf. 2017-2024 · moy={ref:.2f}°C)",
+                      yaxis_title="Écart (°C)", **DARK)
     return fig
 
 
@@ -798,28 +797,6 @@ def fig_precipitations():
     return fig
 
 
-def fig_vent_hum():
-    """Vent & humidité annuels 2017-2025."""
-    annees = list(HIST.keys())
-    vent   = [HIST[a]["vent"]    for a in annees]
-    hum    = [HIST[a]["humidite"]for a in annees]
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Scatter(x=annees, y=vent, name="Vent (m/s)",
-                             mode="lines+markers",
-                             line=dict(color=C["vert"], width=2.5),
-                             marker=dict(size=9)),
-                  secondary_y=False)
-    fig.add_trace(go.Scatter(x=annees, y=hum, name="Humidité (%)",
-                             mode="lines+markers",
-                             line=dict(color=C["bleu"], width=2, dash="dot"),
-                             marker=dict(size=8)),
-                  secondary_y=True)
-    fig.update_layout(title="Vent & Humidité annuels (2017–2025)", **DARK)
-    fig.update_yaxes(title_text="Vent (m/s)", secondary_y=False, color=C["vert"])
-    fig.update_yaxes(title_text="Humidité (%)", secondary_y=True, color=C["bleu"])
-    return fig
-
-
 def fig_ombrothermique():
     """Diagramme ombrothermique Agdez 2025."""
     mois = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -829,29 +806,11 @@ def fig_ombrothermique():
     fig.add_trace(go.Bar(x=mois, y=prec, name="Précipitations (mm)",
                          marker_color="#3498db", opacity=0.75), secondary_y=False)
     fig.add_trace(go.Scatter(x=mois, y=temp, name="Température (°C)",
-                             mode="lines+markers",
-                             line=dict(color=C["rouge"], width=3),
+                             mode="lines+markers", line=dict(color=C["rouge"], width=3),
                              marker=dict(size=9, color=C["rouge"])), secondary_y=True)
     fig.update_layout(title="Diagramme ombrothermique — Agdez 2025", **DARK)
     fig.update_yaxes(title_text="Précipitations (mm)", secondary_y=False, color="#3498db")
     fig.update_yaxes(title_text="Température (°C)", secondary_y=True, color=C["rouge"])
-    return fig
-
-
-def fig_ete_bars():
-    """Températures été 2025 (Juin/Juillet/Août) — données réelles."""
-    mois = list(ETE_2025.keys())
-    vals = [ETE_2025[m]["temperature"] for m in mois]
-    moy  = np.mean(vals)
-    cols = [C["rouge"] if v == max(vals) else C["orange"] for v in vals]
-    fig  = go.Figure(go.Bar(
-        x=mois, y=vals, marker_color=cols,
-        text=[f"{v:.2f}°C" for v in vals], textposition="outside",
-    ))
-    fig.add_hline(y=moy, line_dash="dash", line_color="#58a6ff",
-                  annotation_text=f"Moy été: {moy:.1f}°C", annotation_position="right")
-    fig.update_layout(title="Températures estivales 2025 — Agdez",
-                      yaxis_title="°C", yaxis_range=[0, 38], **DARK)
     return fig
 
 
@@ -870,29 +829,16 @@ def fig_fi(df):
     return fig
 
 
-def fig_fi_pie(df):
-    """Camembert répartition features actives."""
-    dfa = df[df["importance"] > 0].sort_values("importance", ascending=False)
-    fig = go.Figure(go.Pie(
-        labels=dfa["feature"], values=dfa["importance"],
-        hole=0.4,
-        marker=dict(colors=[C["rouge"],C["orange"],"#3498db",C["vert"],
-                             C["violet"],C["cyan"],"#f59e0b","#10b981","#6366f1"]),
-        textinfo="label+percent",
-    ))
-    fig.update_layout(title="Répartition features actives", **DARK,
-                      showlegend=False, height=360)
-    return fig
-
-
 def fig_severity_pie(df):
     """Camembert classes de sévérité incendie 2025."""
+    if df is None or df.empty:
+        return None
     df2 = df[df["Classe"] > 0] if "Classe" in df.columns else df.iloc[1:]
     lbl = df2.iloc[:, 1].tolist() if df2.shape[1] > 1 else ["Faible","Moyen","Fort"]
     val = df2["Surface (ha)"].tolist() if "Surface (ha)" in df2.columns else [323.94, 60.42, 4.15]
     fig = go.Figure(go.Pie(
-        labels=lbl, values=val,
-        hole=0.35, marker=dict(colors=[C["vert"],C["orange"],C["rouge"],"#8e1a1a"]),
+        labels=lbl, values=val, hole=0.35,
+        marker=dict(colors=[C["vert"],C["orange"],C["rouge"],"#8e1a1a"]),
         textinfo="label+percent+value",
         texttemplate="%{label}<br>%{value:.1f} ha (%{percent})",
     ))
@@ -945,97 +891,10 @@ def fig_dnbr_radar(df_idx):
         r=normd + [normd[0]], theta=cats + [cats[0]],
         name="Valeurs normalisées",
         line=dict(color=C["rouge"], width=2),
-        fill="toself",
-        fillcolor=hex2rgba(C["rouge"], 0.15),
+        fill="toself", fillcolor=hex2rgba(C["rouge"], 0.15),
     ))
     fig.update_layout(
         title="Radar NDVI/dNBR",
-        polar=dict(bgcolor="#111", radialaxis=dict(visible=True, range=[0,1])),
-        **DARK,
-    )
-    return fig
-
-
-def fig_scenarios_stack(df):
-    """Barres empilées probabilités réelles par scénario."""
-    short = [s[:30] + "…" if len(s) > 30 else s for s in df["scenario"]]
-    fig   = go.Figure()
-    for col, lbl, col_r in [
-        ("prob_tres_eleve","Très élevé","#8e1a1a"),
-        ("prob_eleve",     "Élevé",     "#e74c3c"),
-        ("prob_moyen",     "Moyen",     "#e67e22"),
-        ("prob_faible",    "Faible",    "#27ae60"),
-    ]:
-        fig.add_trace(go.Bar(
-            name=lbl, x=short, y=df[col] * 100,
-            marker_color=col_r,
-            text=[f"{v:.0%}" if v > 0.04 else "" for v in df[col]],
-            textposition="inside",
-        ))
-    fig.update_layout(
-        barmode="stack",
-        title="Probabilités réelles du modèle — 10 scénarios 2026",
-        yaxis_title="%", xaxis_tickangle=-30,
-        legend=dict(orientation="h", y=1.12), **DARK,
-    )
-    return fig
-
-
-def fig_scenarios_conf(df):
-    """Barres de confiance par scénario."""
-    cols = [RP.get(r, "#888") for r in df["risque_predit"]]
-    short= [s[:30]+"…" if len(s)>30 else s for s in df["scenario"]]
-    fig  = go.Figure(go.Bar(
-        x=short, y=df["confiance"] * 100,
-        marker_color=cols,
-        text=[f"{c:.0%}" for c in df["confiance"]],
-        textposition="outside",
-    ))
-    fig.update_layout(title="Confiance du modèle par scénario (%)",
-                      yaxis_title="%", yaxis_range=[0,115],
-                      xaxis_tickangle=-30, **DARK)
-    return fig
-
-
-def fig_scenarios_heatmap(df):
-    """Heatmap probabilités — 10 scénarios × 4 classes."""
-    short = [s[:28]+"…" if len(s)>28 else s for s in df["scenario"]]
-    prob_m = df[["prob_faible","prob_moyen","prob_eleve","prob_tres_eleve"]].values * 100
-    fig = go.Figure(go.Heatmap(
-        z=prob_m,
-        x=["Faible","Moyen","Élevé","Très élevé"],
-        y=short,
-        colorscale=[[0,"#0d3020"],[0.33,"#3d3000"],[0.66,"#3d1e00"],[1.0,"#3d0000"]],
-        text=[[f"{v:.0f}%" for v in row] for row in prob_m],
-        texttemplate="%{text}",
-        colorbar=dict(title="Prob (%)", thickness=12),
-        hovertemplate="<b>%{y}</b><br>%{x}: %{z:.1f}%<extra></extra>",
-    ))
-    fig.update_layout(title="Heatmap probabilités modèle — scénarios 2026",
-                      **DARK, height=380)
-    return fig
-
-
-def fig_scenarios_radar(df):
-    """Radar météo par catégorie de scénario."""
-    cats  = df["categorie"].unique()
-    cols_v= ["temperature","humidite","precipitation","vent"]
-    lbls  = ["T°C","Humidité","Précip.","Vent"]
-    COLS  = [C["rouge"],"#8e1a1a","#3498db",C["vert"]]
-    fig   = go.Figure()
-    for i, cat in enumerate(cats):
-        sub   = df[df["categorie"] == cat]
-        means = [sub[c].mean() for c in cols_v]
-        maxs  = [df[c].max()   for c in cols_v]
-        normd = [v/m if m > 0 else 0 for v,m in zip(means,maxs)]
-        col   = COLS[i % len(COLS)]
-        fig.add_trace(go.Scatterpolar(
-            r=normd + [normd[0]], theta=lbls + [lbls[0]],
-            name=cat, line=dict(color=col, width=2.2),
-            fill="toself", fillcolor=hex2rgba(col, 0.12),
-        ))
-    fig.update_layout(
-        title="Profil météo par catégorie",
         polar=dict(bgcolor="#111", radialaxis=dict(visible=True, range=[0,1])),
         **DARK,
     )
@@ -1059,7 +918,7 @@ def fig_proj_temp(df):
 
 
 def fig_proj_prob_evol(df):
-    """Évolution probabilités 2026-2035 (données réelles CSV)."""
+    """Évolution probabilités 2026-2035."""
     fig = go.Figure()
     for col, lbl, col_r, dash in [
         ("prob_tres_eleve","Très élevé","#8e1a1a","solid"),
@@ -1069,10 +928,8 @@ def fig_proj_prob_evol(df):
     ]:
         fig.add_trace(go.Scatter(
             x=df["annee"], y=df[col]*100, name=lbl,
-            mode="lines+markers",
-            line=dict(color=col_r, width=2.5, dash=dash),
-            marker=dict(size=9),
-            text=[f"{v:.0%}" for v in df[col]],
+            mode="lines+markers", line=dict(color=col_r, width=2.5, dash=dash),
+            marker=dict(size=9), text=[f"{v:.0%}" for v in df[col]],
             hovertemplate=f"<b>{lbl}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
         ))
     fig.update_layout(title="Évolution probabilités par classe — 2026→2035",
@@ -1084,8 +941,7 @@ def fig_proj_heatmap(df):
     """Heatmap probabilités 2026-2035."""
     prob_m = df[["prob_faible","prob_moyen","prob_eleve","prob_tres_eleve"]].values * 100
     fig = go.Figure(go.Heatmap(
-        z=prob_m,
-        x=["Faible","Moyen","Élevé","Très élevé"],
+        z=prob_m, x=["Faible","Moyen","Élevé","Très élevé"],
         y=[str(int(a)) for a in df["annee"]],
         colorscale=[[0,"#0d3020"],[0.33,"#3d3000"],[0.66,"#3d1e00"],[1.0,"#3d0000"]],
         text=[[f"{v:.0f}%" for v in row] for row in prob_m],
@@ -1097,75 +953,6 @@ def fig_proj_heatmap(df):
     return fig
 
 
-def fig_fvt(model, le):
-    """Fenêtre de Vulnérabilité Temporelle — simulation journalière été 2026."""
-    dates = pd.date_range("2026-06-01", "2026-08-31", freq="D")
-    np.random.seed(42)
-    rows  = []
-    for d in dates:
-        doy = d.timetuple().tm_yday
-        t   = round(29.5 + 3.5*np.sin(np.pi*(doy-152)/91) + np.random.normal(0,1.2), 2)
-        h   = round(max(8.0, 20.0-4.0*np.sin(np.pi*(doy-152)/91) + np.random.normal(0,2)), 2)
-        p   = round(max(0.0, np.random.exponential(3.5) if np.random.random()<0.12 else 0.0), 2)
-        v   = round(max(1.5, 4.0 + np.random.normal(0,0.4)), 2)
-        rows.append(dict(date=d, temperature=t, humidite=h, precipitation=p, vent=v,
-                         mois_num={6:0,7:1,8:2}[d.month],
-                         pente=PENTE, altitude=ALTITUDE, exposition=EXPOSITION,
-                         ndvi_avant=0.144))
-    df = pd.DataFrame(rows)
-    df["indice_secheresse"]  = (df["temperature"] - df["humidite"]) / (df["precipitation"] + 0.1)
-    df["indice_propagation"] = df["vent"] * np.sin(np.radians(PENTE))
-    df["stress_vegetal"]     = (1-0.144) * df["temperature"] / 10
-    df["exposition_sud"]     = float(np.cos(np.radians(EXPOSITION-180)))
-    X  = df[FEAT_ORDER]
-    lbs= le.inverse_transform(model.predict(X))
-    df["risque"] = lbs
-    df["r_num"]  = [{"Faible":0,"Moyen":1,"Élevé":2,"Très élevé":3}[l] for l in lbs]
-    cs = [[0.0,"#27ae60"],[0.33,"#e67e22"],[0.67,"#e74c3c"],[1.0,"#8e1a1a"]]
-    fig = go.Figure(go.Heatmap(
-        z=df["r_num"].values,
-        x=df["date"].dt.strftime("%d/%m").values,
-        y=["Risque"]*len(df),
-        colorscale=cs, zmin=0, zmax=3,
-        text=df["risque"].values,
-        hovertemplate="<b>%{x}</b><br>Risque: %{text}<br>T=%{customdata[0]}°C H=%{customdata[1]}%<extra></extra>",
-        customdata=np.column_stack([df["temperature"], df["humidite"]]),
-        colorbar=dict(tickvals=[0,1,2,3],
-                      ticktext=["Faible","Moyen","Élevé","Très élevé"],
-                      thickness=12, len=0.6),
-    ))
-    fig.update_layout(
-        title="🗓️ Fenêtre de Vulnérabilité Temporelle — Été 2026 (92 jours simulés)",
-        xaxis=dict(tickangle=-45, tickfont=dict(size=7)),
-        yaxis=dict(showticklabels=False), height=220, **DARK,
-    )
-    return fig, df
-
-
-def fig_proba_gauge(probas: dict, risque: str):
-    val = probas.get(risque, 0) * 100
-    col = RISQUE_COLOR.get(risque, "#888")
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=val,
-        title={"text": f"P({risque})", "font": {"size": 12}},
-        number={"suffix": "%", "font": {"size": 25}},
-        gauge={
-            "axis": {"range": [0,100], "tickcolor":"#555"},
-            "bar":  {"color": col, "thickness": 0.75},
-            "bgcolor": "#111",
-            "steps": [{"range":[0,25],"color":"#1a1a1a"},{"range":[25,50],"color":"#1f1a10"},
-                      {"range":[50,75],"color":"#2a1010"},{"range":[75,100],"color":"#3d0000"}],
-            "threshold": {"line": {"color": col, "width": 4}, "value": val},
-        },
-    ))
-    fig.update_layout(paper_bgcolor="#0d0d1a", font_family="Syne",
-                      font_color="#e2e8f0",
-                      margin=dict(t=50,b=10,l=20,r=20), height=200)
-    return fig
-
-
-# ── Carte Folium ──────────────────────────────────────────────────────────────
 def make_map(risque, conf, probas, t, h, p, v, mois, annee):
     color = RISQUE_COLOR.get(risque, "#888")
     emoji = RISQUE_EMOJI.get(risque, "⚪")
@@ -1200,14 +987,13 @@ def make_map(risque, conf, probas, t, h, p, v, mois, annee):
                    tiles="CartoDB dark_matter", prefer_canvas=True)
     folium.Circle(location=[LAT, LON], radius=5000, color=color,
                   fill=True, fill_opacity=0.10, weight=1.5).add_to(m)
-    folium.CircleMarker(
-        location=[LAT, LON], radius=16, color=color,
+    folium.CircleMarker(location=[LAT, LON], radius=16, color=color,
         fill=True, fill_color=color, fill_opacity=0.85, weight=3,
         popup=folium.Popup(popup_html, max_width=330),
         tooltip=f"🔥 Agdez — {risque} ({conf:.0%})",
     ).add_to(m)
     folium.CircleMarker(location=[LAT, LON], radius=4, color="white",
-                        fill=True, fill_color="white", fill_opacity=1, weight=0).add_to(m)
+        fill=True, fill_color="white", fill_opacity=1, weight=0).add_to(m)
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attr="ESRI", name="🛰️ Satellite", overlay=False,
@@ -1303,55 +1089,16 @@ def sidebar(meteo_rt):
     return annee, mois, temperature, humidite, precipitation, vent, ndvi
 
 
+
+
+
 # ============================================================================
 # ── MAIN ─────────────────────────────────────────────────────────────────────
 # ============================================================================
 def main():
-    # Load realtime monitoring data
-    try:
-        with open("data/meteo_daily/live_data.json", "r") as f:
-            live_data = json.load(f)
-
-    except:
-        live_data = None
-
     model, le = load_model()
     D         = load_data()
     meteo_rt  = fetch_meteo_realtime()
-    # ===============================
-    # REALTIME MONITORING
-# ===============================
-
-    st.subheader("🔥 Realtime Fire Monitoring")
-    if live_data:
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric(
-                "🌡 Temperature",
-               f"{live_data.get('temperature', 0)} °C"
-            )
-        with col2:
-            st.metric(
-                "💧 Humidity",
-              f"{live_data.get('humidity', 0)} %"
-            )
-        with col3:
-            st.metric(
-                "💨 Wind",
-                f"{live_data.get('wind', 0)} km/h"
-            )
-        with col4:
-            st.metric(
-                "🔥 AI Risk",
-              live_data.get('risk', 'Unknown')
-          )
-    
-
-    else:
-        
-        st.warning("No realtime monitoring data")
-
     # ── Gestionnaire d'alertes ────────────────────────────────────────────────
     cfg_alertes = ConfigAlertes()
 
@@ -1398,22 +1145,6 @@ def main():
 
     color = RISQUE_COLOR.get(risque, "#888")
 
-    # ── ALERTE DYNAMIQUE ──────────────────────────────────────────────────────
-    if risque in ["Élevé", "Très élevé"]:
-        css_alert = "alert-r" if risque == "Très élevé" else "alert-o"
-        tag_css   = "tag-r"   if risque == "Très élevé" else "tag-o"
-        st.markdown(f"""
-        <div class="{css_alert}">
-          <span class="tag {tag_css}">⚡ ALERTE {'CRITIQUE' if risque=='Très élevé' else 'HAUTE'}</span>
-          <div style="font-weight:700;font-size:1rem;margin:4px 0">
-            {RISQUE_EMOJI[risque]} Risque {risque} prédit — {mois} {annee}
-          </div>
-          <div style="font-size:0.85rem;color:#ddd;line-height:1.7">
-            Confiance : <b>{conf:.0%}</b> · T={temperature}°C · H={humidite}% · P={precipitation}mm · V={vent}m/s<br>
-            {recommendation(risque)}
-          </div>
-        </div>""", unsafe_allow_html=True)
-
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown(f"""
     <div class="app-hdr">
@@ -1422,798 +1153,414 @@ def main():
          Random Forest v1.0.0 · Données 2017–2025 · Incendie 15 Sep. 2025</p>
     </div>""", unsafe_allow_html=True)
 
-    # ── KPIs ──────────────────────────────────────────────────────────────────
-    k1,k2,k3,k4,k5,k6,k7 = st.columns(7)
-    kpis = [
-        (k1, f"{RISQUE_EMOJI[risque]} {risque}", f"{mois} {annee}", color),
-        (k2, f"{conf:.0%}", "Confiance modèle",  "#3498db"),
-        (k3, f"{temperature}°C", "Température",  "#e74c3c"),
-        (k4, f"{humidite}%",     "Humidité",     "#3498db"),
-        (k5, "388.51 ha",        "Surface brûlée 2025", "#d62828"),
-        (k6, "0.1443",           "NDVI avant 2025",     "#27ae60"),
-        (k7, "76.7%",            "Accuracy CV modèle",  "#a855f7"),
-    ]
-    for col, val, lbl, clr in kpis:
-        col.markdown(f"""
-        <div class="kpi">
-          <div class="v" style="color:{clr}">{val}</div>
-          <div class="l">{lbl}</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Source météo
-    if meteo_rt:
-        st.info(f"📡 **Météo temps réel** — Agdez : T={meteo_rt['temperature']}°C | "
-                f"H={meteo_rt['humidite']}% | P={meteo_rt['precipitation']}mm | "
-                f"V={meteo_rt['vent']}m/s · Source : {meteo_rt['source']}")
-
     # ── ONGLETS ───────────────────────────────────────────────────────────────
     tabs = st.tabs([
-        "🗺️ Carte & Risque",
-        "🌡️ Climatologie",
-        "🔥 Incendie 2025",
-        "🛰️ Indices Spectraux",
-        "📋 Scénarios 2026",
+        "🧠 Centre Opérationnel",
+        "🌡️ Climatologie & Tendances",
+        "🛰️ Télédétection & Analyse",
+        "🤖 IA & Modèle",
         "🔔 Alertes",
-        "🗓️ FVT",
-        "🌍 Projections 2026–2035",
-        "🧮 Comparateur",
-        "📊 Modèle & Données",
     ])
 
     # =========================================================================
-    # TAB 1 — Carte & Risque
+    # TAB 0 — Centre Opérationnel (pipeline complet)
     # =========================================================================
     with tabs[0]:
-        col_map, col_info = st.columns([3, 1])
-        with col_map:
-            st.markdown('<div class="sec">Carte de risque — Agdez</div>', unsafe_allow_html=True)
-            map_data = st_folium(
-                make_map(risque, conf, probas, temperature, humidite, precipitation, vent, mois, annee),
-                width="100%", height=490,
-                returned_objects=["last_object_clicked"],
-            )
-        with col_info:
-            clicked = (map_data and map_data.get("last_object_clicked") and
-                       map_data["last_object_clicked"].get("lat") is not None)
-            st.markdown(f'<div class="sec">{"📍 Cliqué" if clicked else "📍 Informations"}</div>',
-                        unsafe_allow_html=True)
-            st.markdown(f"""
-            <div style="text-align:center;padding:15px;background:{'#fdf2f2' if risque in ['Élevé','Très élevé'] else '#eafaf1'};
-                        border-radius:12px;border:2px solid {color};margin-bottom:12px">
-              <div style="font-size:2.2rem">{RISQUE_EMOJI[risque]}</div>
-              <div style="font-size:1.25rem;font-weight:800;color:{color}">{risque}</div>
-              <div style="font-size:0.78rem;color:#666">{conf:.0%} confiance · {mois} {annee}</div>
-            </div>""", unsafe_allow_html=True)
-            st.plotly_chart(fig_proba_gauge(probas, risque), width="stretch",
-                            config={"displayModeBar": False})
-            # Info dynamique
-            ind_sec = round((temperature - humidite) / (precipitation + 0.1), 2)
-            st.markdown(f"""
-            <div class="ibox" style="font-size:0.77rem;line-height:2.1;font-family:'Space Mono',monospace">
-            📅 <b>{mois} {annee}</b><br>
-            🌡️ <b>{temperature}°C</b><br>
-            💧 <b>{humidite}%</b><br>
-            🌧️ <b>{precipitation}mm</b><br>
-            💨 <b>{vent}m/s</b><br>
-            🌿 NDVI <b>{ndvi:.3f}</b><br>
-            🔥 Ind. sécheresse <b>{ind_sec:.2f}</b><br>
-            ⛰️ Alt. <b>{ALTITUDE}m</b><br>
-            📐 Pente <b>{PENTE}°</b><br>
-            🧭 Expo. <b>165.51° S-E</b>
-            </div>""", unsafe_allow_html=True)
-            # Probabilités barres
-            st.markdown('<div class="sec" style="margin-top:10px">Probabilités</div>',
-                        unsafe_allow_html=True)
-            for cls, pb in probas.items():
-                clr = RISQUE_COLOR.get(cls,"#888")
-                st.markdown(f"""
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-                  <div style="width:78px;font-size:0.68rem;font-family:'Space Mono',monospace;color:#a0aec0">{cls}</div>
-                  <div style="flex:1;background:#222;border-radius:3px;height:9px">
-                    <div style="background:{clr};width:{pb*100:.0f}%;height:9px;border-radius:3px"></div>
-                  </div>
-                  <div style="width:34px;font-size:0.68rem;font-family:'Space Mono',monospace;color:#a0aec0;text-align:right">{pb:.0%}</div>
-                </div>""", unsafe_allow_html=True)
-            st.markdown(f"""
-            <div style="background:#111;border-radius:8px;padding:10px;margin-top:10px;
-                        border-left:3px solid {color};font-size:0.8rem;line-height:1.6">
-            {recommendation(risque)}
-            </div>""", unsafe_allow_html=True)
-            # Risque réel historique si disponible
-            if annee <= 2025 and annee in RISQUES_REELS:
-                rr = RISQUES_REELS[annee]
-                cr = RISQUE_COLOR.get(rr,"#888")
-                st.markdown(f"""
-                <div style="background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;
-                            padding:8px 12px;margin-top:8px;font-size:0.78rem">
-                ✅ <b>Risque réel observé {annee} :</b>
-                <span style="color:{cr};font-weight:bold">{rr}</span>
-                </div>""", unsafe_allow_html=True)
+        st.markdown('<div class="sec">① Monitoring Temps Réel</div>', unsafe_allow_html=True)
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric("🌡️ Température", f"{temperature}°C")
+        c2.metric("💧 Humidité", f"{humidite}%")
+        c3.metric("💨 Vent", f"{vent} m/s")
+        c4.metric("🌧️ Précipitations", f"{precipitation} mm")
+        if meteo_rt:
+            st.caption(f"📡 Source : {meteo_rt['source']} · {datetime.now().strftime('%d/%m/%Y %H:%M')} · Ajustable dans la barre latérale")
+        else:
+            st.caption("💡 Mode simulation — ajustez les valeurs dans la barre latérale")
+
+        st.markdown("---")
+        st.markdown('<div class="sec">② Prédiction ML</div>', unsafe_allow_html=True)
+        k1,k2,k3,k4 = st.columns(4)
+        k1.markdown(f'<div class="kpi"><div class="v" style="color:{color}">{RISQUE_EMOJI[risque]} {risque}</div><div class="l">Risque prédit · {mois} {annee}</div></div>', unsafe_allow_html=True)
+        k2.markdown(f'<div class="kpi"><div class="v" style="color:#3498db">{conf:.0%}</div><div class="l">Confiance modèle</div></div>', unsafe_allow_html=True)
+        k3.markdown(f'<div class="kpi"><div class="v" style="color:#f39c12">{temperature}°C · {humidite}%</div><div class="l">T° & Humidité</div></div>', unsafe_allow_html=True)
+        k4.markdown(f'<div class="kpi"><div class="v" style="color:#06b6d4">{precipitation}mm · {vent}m/s</div><div class="l">Pluie & Vent</div></div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="sec" style="margin-top:-8px">Probabilités par classe</div>', unsafe_allow_html=True)
+        cols_p = st.columns(4)
+        for cls, pb in probas.items():
+            clr = RISQUE_COLOR.get(cls,"#888")
+            idx = ["Faible","Moyen","Élevé","Très élevé"].index(cls)
+            cols_p[idx].markdown(f'<div style="background:#16213e;border-radius:8px;padding:8px;text-align:center;border-bottom:3px solid {clr}"><div style="font-size:0.7rem;color:#a0aec0">{cls}</div><div style="font-size:1.2rem;font-weight:700;color:{clr}">{pb:.0%}</div></div>', unsafe_allow_html=True)
+
+        st.plotly_chart(fig_proba_gauge(probas, risque), use_container_width=True, config={"displayModeBar":False})
+
+        st.markdown("---")
+        st.markdown('<div class="sec">③ Carte de situation — Folium</div>', unsafe_allow_html=True)
+        with st.spinner("🔄 Chargement de la carte interactive…"):
+            folium_map = make_map(risque, conf, probas, temperature, humidite, precipitation, vent, mois, annee)
+            st_folium(folium_map, width=None, height=450, key="folium_map_op")
+        st.caption(f"Carte centrée sur Agdez (30.69°N, 6.45°W) · Cercle de 5 km · Niveau de risque : {risque}")
+
+        st.markdown("---")
+        st.markdown('<div class="sec">④ Analyse IA de la situation</div>', unsafe_allow_html=True)
+
+        ai_result = st.session_state.get("ai_result")
+        force_refresh = st.button("🔄 Actualiser l'analyse IA", type="secondary", key="refresh_ai")
+        if force_refresh or ai_result is None:
+            with st.spinner("🧠 Analyse IA en cours…"):
+                try:
+                    from src.ai.llm_service import analyse_ia
+                    prompt_data = {
+                        "temperature": temperature, "humidite": humidite,
+                        "precipitation": precipitation, "vent": vent,
+                        "ndvi": ndvi, "risque": risque, "confiance": conf,
+                        "probas": probas, "mois": mois, "annee": annee,
+                        "altitude": ALTITUDE, "pente": PENTE,
+                    }
+                    ai_result = analyse_ia(prompt_data)
+                except Exception as e:
+                    ai_result = {"erreur": str(e), "fallback": True}
+                st.session_state["ai_result"] = ai_result
+
+        if ai_result and ai_result.get("erreur") and ai_result.get("fallback"):
+            if ai_result.get("quota_exceeded"):
+                st.warning("⚠️ Gemini API connected but quota exceeded. Switching to local expert system.")
+            else:
+                st.warning(f"⚠️ API IA indisponible. Utilisation du système expert local. ({ai_result['erreur']})")
+            from src.ai.explanator import analyser_risque, generer_explication
+            from src.ai.awareness import generer_message_population
+            from src.ai.bulletin import generer_bulletin
+            analyse = analyser_risque(temperature, humidite, precipitation, vent, ndvi, risque)
+            explication = generer_explication(analyse)
+            awareness = generer_message_population(risque, temperature, vent)
+            bulletin = generer_bulletin(risque, conf, temperature, humidite, precipitation, vent, ndvi, mois, annee, probas)
+            st.markdown(f'<div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.9rem;font-weight:700;color:#f39c12;margin-bottom:8px">📋 Bulletin Opérationnel</div><div style="font-size:0.8rem;color:#cbd5e1;line-height:1.8"><b>Risque :</b> <span style="color:{color};font-weight:bold">{risque}</span> · <b>Confiance :</b> {conf:.0%}<br><b>Conditions :</b> T={temperature}°C · H={humidite}% · P={precipitation}mm · V={vent}m/s<br><b>NDVI :</b> {ndvi:.4f}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background:#0a1a2a;border:1px solid #1a3a5c;border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.9rem;font-weight:700;color:#f39c12;margin-bottom:8px">🧠 Explication</div><div style="font-size:0.8rem;color:#cbd5e1;line-height:1.8">{explication}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background:#0d1a0d;border:1px solid #1a3a1a;border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.8rem;color:#cbd5e1;line-height:1.8;white-space:pre-line">{awareness}</div></div>', unsafe_allow_html=True)
+        elif ai_result and not ai_result.get("erreur"):
+            ex = ai_result.get("explication", "")
+            aw = ai_result.get("sensibilisation", "")
+            bo = ai_result.get("bulletin", "")
+            if bo:
+                st.markdown(f'<div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.9rem;font-weight:700;color:#f39c12;margin-bottom:8px">📋 Bulletin Opérationnel</div><div style="font-size:0.8rem;color:#cbd5e1;line-height:1.8;white-space:pre-line">{bo}</div></div>', unsafe_allow_html=True)
+            if ex:
+                st.markdown(f'<div style="background:#0a1a2a;border:1px solid #1a3a5c;border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.9rem;font-weight:700;color:#f39c12;margin-bottom:8px">🧠 Explication de la prédiction</div><div style="font-size:0.8rem;color:#cbd5e1;line-height:1.8;white-space:pre-line">{ex}</div></div>', unsafe_allow_html=True)
+            if aw:
+                st.markdown(f'<div style="background:{ "#3d0000" if risque=="Très élevé" else "#3d1e00" if risque=="Élevé" else "#0d3020" };border:1px solid {color};border-radius:12px;padding:16px;margin-bottom:12px"><div style="font-size:0.9rem;font-weight:700;color:{color};margin-bottom:8px">{RISQUE_EMOJI[risque]} Message de sensibilisation</div><div style="font-size:0.8rem;color:#e2e8f0;line-height:1.8;white-space:pre-line">{aw}</div></div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Analyse IA en attente. Clique sur « Actualiser l'analyse IA ».")
+
+        st.markdown("---")
+        st.markdown('<div class="sec">⑤ Alerte Dynamique</div>', unsafe_allow_html=True)
+        if risque in ["Élevé","Très élevé"]:
+            css_a = "alert-r" if risque=="Très élevé" else "alert-o"
+            tag_a = "tag-r" if risque=="Très élevé" else "tag-o"
+            st.markdown(f"""<div class="{css_a}"><span class="tag {tag_a}">⚡ ALERTE {"CRITIQUE" if risque=="Très élevé" else "HAUTE"}</span><div style="font-weight:700;font-size:1rem;margin:4px 0">{RISQUE_EMOJI[risque]} Risque {risque} prédit — {mois} {annee}</div><div style="font-size:0.85rem;color:#ddd;line-height:1.7">Confiance : <b>{conf:.0%}</b> · T={temperature}°C · H={humidite}% · P={precipitation}mm · V={vent}m/s<br>{recommendation(risque)}</div></div>""", unsafe_allow_html=True)
+            if st.button("📤 Envoyer l'alerte par email", type="primary", key="op_alert_send"):
+                with st.spinner("⏳ Envoi via Railway…"):
+                    res = envoyer_alerte(cfg_alertes, risque, conf, temperature, humidite, precipitation, vent, mois, annee, probas, recommendation(risque))
+                email_res = res.get("email") or {}
+                webhook_res = res.get("webhook") or {}
+                json_res = res.get("json") or {}
+                if email_res.get("succes"): st.success(f"✅ Email envoyé → {email_res.get('destinataires','?')}")
+                if webhook_res.get("succes"): st.success("✅ Webhook envoyé")
+                if json_res.get("succes"): st.info(f"💾 Événement sauvegardé : {json_res.get('fichier','?')}")
+                if email_res.get("erreur"): st.error(email_res["erreur"])
+        else:
+            st.success(f"✅ Risque **{risque}** — Aucune alerte requise. Surveillance standard.")
 
     # =========================================================================
-    # TAB 2 — Climatologie
+    # TAB 1 — Climatologie & Tendances
     # =========================================================================
     with tabs[1]:
-        st.markdown('<div class="sec">Analyse climatique 2017–2035 (données réelles + projections)</div>',
-                    unsafe_allow_html=True)
-
-        df_proj = D["proj"]
-        c1, c2  = st.columns(2)
-        with c1:
-            st.plotly_chart(fig_temp_humidity_full(df_proj), width="stretch")
-        with c2:
-            st.plotly_chart(fig_anomalies(), width="stretch")
-
-        c3, c4  = st.columns(2)
-        with c3:
-            st.plotly_chart(fig_precipitations(), width="stretch")
-        with c4:
-            st.plotly_chart(fig_vent_hum(), width="stretch")
-
-        c5, c6  = st.columns(2)
-        with c5:
-            st.plotly_chart(fig_ete_bars(), width="stretch")
-        with c6:
-            st.plotly_chart(fig_ombrothermique(), width="stretch")
-
-        # Tableau données historiques
-        st.markdown("---")
-        st.markdown('<div class="sec">Données historiques annuelles (2017–2025)</div>',
-                    unsafe_allow_html=True)
-        df_hist = pd.DataFrame(HIST).T.reset_index().rename(columns={"index": "Année"})
-        df_hist["Risque réel"] = df_hist["Année"].map(RISQUES_REELS)
-        st.dataframe(df_hist.style.map(style_risque, subset=["Risque réel"])
-                     .format({"temperature":"{:.2f}","humidite":"{:.2f}",
-                              "precipitation":"{:.1f}","vent":"{:.2f}"}),
-                     width="stretch")
-
-    # =========================================================================
-    # TAB 3 — Incendie 2025
-    # =========================================================================
-    with tabs[2]:
-        st.markdown('<div class="sec">Incendie Agdez — 15 Septembre 2025</div>',
-                    unsafe_allow_html=True)
-
-        i1,i2,i3,i4,i5 = st.columns(5)
-        i1.metric("Zone",             "Agdez (Drâa-Tafilalet)")
-        i2.metric("Date",             "15 Sep. 2025")
-        i3.metric("Surface brûlée",   "388.51 ha")
-        i4.metric("% zone brûlée",    "5.96%")
-        i5.metric("Surface totale",   "6 520.8 ha")
-
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
-            # Classes sévérité — données exactes
-            sev_data = pd.DataFrame({
-                "Classe": ["Faible","Moyen","Fort","Très fort"],
-                "Surface (ha)": [323.94, 60.42, 4.15, 0.0],
-                "Pourcentage (%)": [4.97, 0.93, 0.06, 0.0],
-                "Pixels": [32394, 6042, 415, 0],
-            })
-            st.plotly_chart(go.Figure(go.Pie(
-                labels=sev_data["Classe"], values=sev_data["Surface (ha)"],
-                hole=0.35,
-                marker=dict(colors=[C["vert"],C["orange"],C["rouge"],"#8e1a1a"]),
-                textinfo="label+percent+value",
-                texttemplate="%{label}<br>%{value:.1f} ha (%{percent})",
-            )).update_layout(title="Classes de sévérité — Incendie 2025", **DARK),
-            width="stretch")
-        with c2:
-            fig_s = go.Figure(go.Bar(
-                x=sev_data["Classe"], y=sev_data["Surface (ha)"],
-                marker_color=[C["vert"],C["orange"],C["rouge"],"#8e1a1a"],
-                text=[f"{v:.2f} ha\n({p:.2f}%)" for v,p in zip(sev_data["Surface (ha)"],sev_data["Pourcentage (%)"])],
-                textposition="outside",
-            ))
-            fig_s.update_layout(title="Surface brûlée par classe (ha)", **DARK,
-                                yaxis_title="ha", yaxis_range=[0,370])
-            st.plotly_chart(fig_s, width="stretch")
-
-        # Tableau récapitulatif
-        st.markdown('<div class="sec" style="margin-top:14px">Tableau classes de sévérité</div>',
-                    unsafe_allow_html=True)
-        st.dataframe(sev_data, width="stretch")
-
-        # Récapitulatif facteurs
-        st.markdown("---")
-        st.markdown('<div class="sec">Facteurs climatiques → Incendie</div>',
-                    unsafe_allow_html=True)
-        facteurs = [
-            ("Température max (juillet)", "32.69°C", "Très haut", C["rouge"]),
-            ("Humidité min (juillet)",    "16.42%",  "Favorise le feu", C["rouge"]),
-            ("Vent max (juin)",           "4.50 m/s","Propagation", C["orange"]),
-            ("Précipitations juillet",    "26.43 mm","Exceptionnel", C["orange"]),
-            ("Surface brûlée",            "388.51 ha","Important", C["rouge"]),
-            ("dNBR maximum",              "0.5928",  "Sévère", "#8e1a1a"),
-        ]
-        for fact, val, imp, clr in facteurs:
-            st.markdown(f"""
-            <div style="display:flex;justify-content:space-between;padding:8px 12px;
-                        background:#16213e;border-radius:6px;margin-bottom:5px;
-                        border-left:3px solid {clr}">
-              <span style="font-size:0.83rem">{fact}</span>
-              <span style="font-family:'Space Mono',monospace;font-size:0.83rem;font-weight:bold;color:#ddd">{val}</span>
-              <span style="font-size:0.78rem;color:{clr}">{imp}</span>
-            </div>""", unsafe_allow_html=True)
-
-    # =========================================================================
-    # TAB 4 — Indices Spectraux
-    # =========================================================================
-    with tabs[3]:
-        st.markdown('<div class="sec">Indices spectraux NDVI · NBR · dNBR — Incendie 2025</div>',
-                    unsafe_allow_html=True)
-
-        # Données exactes
-        indices_data = pd.DataFrame({
-            "Indice": ["NDVI_avant","NDVI_après","dNBR"],
-            "Moyenne":     [0.1443, 0.1167, 0.0248],
-            "Minimum":    [-0.2090,-0.1119,-0.5661],
-            "Maximum":    [ 0.8995, 0.8107, 0.5928],
-            "Écart-type": [ 0.1447, 0.1275, 0.0522],
-        })
-
-        i1,i2,i3 = st.columns(3)
-        i1.metric("NDVI avant",  "0.1443", "Max: 0.8995")
-        i2.metric("NDVI après",  "0.1167", "-19.1% (perte)")
-        i3.metric("dNBR max",    "0.5928", "Sévérité élevée")
+        st.markdown('<div class="sec">Évolution climatique 2017–2035</div>', unsafe_allow_html=True)
+        if D["proj"] is not None:
+            st.plotly_chart(fig_temp_humidity_full(D["proj"]), use_container_width=True)
+        else:
+            st.warning("Données de projections climatiques non disponibles.")
 
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(fig_ndvi_bars(indices_data), width="stretch")
+            st.plotly_chart(fig_anomalies(), use_container_width=True)
         with c2:
-            st.plotly_chart(fig_dnbr_radar(indices_data), width="stretch")
+            st.plotly_chart(fig_precipitations(), use_container_width=True)
 
-        # Tableau complet
-        st.markdown('<div class="sec" style="margin-top:12px">Statistiques indices spectraux</div>',
-                    unsafe_allow_html=True)
-        st.dataframe(indices_data.style.format({
-            "Moyenne":"{:.4f}","Minimum":"{:.4f}",
-            "Maximum":"{:.4f}","Écart-type":"{:.4f}",
-        }), width="stretch")
+        st.markdown('<div class="sec">Diagramme ombrothermique</div>', unsafe_allow_html=True)
+        st.plotly_chart(fig_ombrothermique(), use_container_width=True)
 
-        # Interprétation dNBR
-        st.markdown("---")
-        st.markdown('<div class="sec">Interprétation dNBR</div>', unsafe_allow_html=True)
-        dnbr_classes = [
-            ("<-0.10", "Régénération végétale",  C["vert"],   False),
-            ("-0.10 – 0.10","Non brûlé",          "#a0aec0",  False),
-            ("0.10 – 0.27","Sévérité faible",      C["orange"],False),
-            ("0.27 – 0.44","Sévérité modérée",     "#e67e22",  False),
-            ("0.44 – 0.66","Sévérité élevée ← Agdez 2025", C["rouge"], True),
-            (">0.66",      "Sévérité très élevée", "#8e1a1a",  False),
-        ]
-        for rng, lbl, clr, active in dnbr_classes:
-            brd = f"4px solid {clr}" if active else f"2px solid {clr}"
-            st.markdown(f"""
-            <div style="display:flex;gap:12px;padding:6px 10px;margin-bottom:4px;
-                        background:#16213e;border-radius:5px;border-left:{brd}">
-              <span style="font-family:'Space Mono',monospace;font-size:0.73rem;color:#a0aec0;width:115px">{rng}</span>
-              <span style="font-size:0.8rem;color:{clr};{"font-weight:bold" if active else ""}">{lbl}</span>
-            </div>""", unsafe_allow_html=True)
-
-    # =========================================================================
-    # TAB 5 — Scénarios 2026 (données exactes du modèle)
-    # =========================================================================
-    with tabs[4]:
-        st.markdown('<div class="sec">Scénarios 2026 — Probabilités exactes du modèle Random Forest</div>',
-                    unsafe_allow_html=True)
-        df_sc = D["sc"]
-        if df_sc is not None:
-            # KPIs
-            nb_te = (df_sc["risque_predit"]=="Très élevé").sum()
-            nb_el = (df_sc["risque_predit"]=="Élevé").sum()
-            nb_mo = (df_sc["risque_predit"]=="Moyen").sum()
-            k1,k2,k3,k4 = st.columns(4)
-            k1.metric("🔴 Très élevé", f"{nb_te}/10")
-            k2.metric("🟠 Élevé",      f"{nb_el}/10")
-            k3.metric("🟡 Moyen",      f"{nb_mo}/10")
-            k4.metric("📊 Conf. moy.", f"{df_sc['confiance'].mean():.0%}")
-
-            st.markdown("---")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.plotly_chart(fig_scenarios_stack(df_sc), width="stretch")
-            with c2:
-                st.plotly_chart(fig_scenarios_conf(df_sc), width="stretch")
-
+        st.markdown('<div class="sec">Projections climatiques 2026–2035</div>', unsafe_allow_html=True)
+        if D["proj"] is not None:
             c3, c4 = st.columns(2)
             with c3:
-                st.plotly_chart(fig_scenarios_heatmap(df_sc), width="stretch")
+                st.plotly_chart(fig_proj_temp(D["proj"]), use_container_width=True)
             with c4:
-                st.plotly_chart(fig_scenarios_radar(df_sc), width="stretch")
+                st.plotly_chart(fig_proj_heatmap(D["proj"]), use_container_width=True)
+            st.plotly_chart(fig_proj_prob_evol(D["proj"]), use_container_width=True)
 
-            # Tableau complet
-            st.markdown('<div class="sec" style="margin-top:10px">Tableau complet — données exactes</div>',
-                        unsafe_allow_html=True)
-            cats = ["Tous"] + sorted(df_sc["categorie"].unique().tolist())
-            cat  = st.selectbox("Filtrer", cats)
-            df_sh= df_sc if cat=="Tous" else df_sc[df_sc["categorie"]==cat]
-            cols_d = ["categorie","scenario","mois","temperature","humidite",
-                      "precipitation","vent","risque_predit","confiance",
-                      "prob_faible","prob_moyen","prob_eleve","prob_tres_eleve"]
-            st.dataframe(
-                df_sh[cols_d].style
-                .map(style_risque, subset=["risque_predit"])
-                .format({"confiance":"{:.0%}","prob_faible":"{:.2%}",
-                         "prob_moyen":"{:.2%}","prob_eleve":"{:.2%}",
-                         "prob_tres_eleve":"{:.2%}"}),
-                width="stretch", height=350,
+    # =========================================================================
+    # TAB 2 — Télédétection & Analyse
+    # =========================================================================
+    BASE_IMG = BASE / "data" / "processed" / "images" / "satellite"
+
+    with tabs[2]:
+        st.markdown("""
+        <div style="background:#0a1628;border:1px solid #1a3a5c;border-radius:8px;padding:10px 14px;margin-bottom:10px">
+        <b style="font-size:1rem;color:#f39c12">🛰️ Télédétection & Analyse Spatiale — Incendie Agdez 2025</b>
+        <span style="font-size:0.75rem;color:#94a3b8;float:right">Sentinel-2 · NDVI · NBR · dNBR · MNT</span></div>""", unsafe_allow_html=True)
+
+        IMG_W = 340
+
+        # ── Section 1 : NDVI ──
+        st.markdown('<div class="sec" style="font-size:0.85rem;padding:4px 8px">① NDVI — Indice de Végétation</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        p_ndvi_av = BASE_IMG / "carte_ndvi_avant.png"
+        p_ndvi_ap = BASE_IMG / "carte_ndvi_apres.png"
+        with c1:
+            if p_ndvi_av.exists():
+                st.image(str(p_ndvi_av), caption="NDVI avant (14/09)", width=IMG_W)
+            else: st.warning("Indisponible")
+        with c2:
+            if p_ndvi_ap.exists():
+                st.image(str(p_ndvi_ap), caption="NDVI après (16/09)", width=IMG_W)
+            else: st.warning("Indisponible")
+        st.markdown('<div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:6px;padding:6px 10px;font-size:0.72rem;color:#cbd5e1;margin-bottom:6px"><b>📖</b> NDVI moyen : 0.144 → 0.117 (Δ −19.1 %). Destruction de la biomasse et exposition du sol nu.</div>', unsafe_allow_html=True)
+
+        # ── Section 2 : NBR ──
+        st.markdown('<div class="sec" style="font-size:0.85rem;padding:4px 8px">② NBR — Détection des Zones Brûlées</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        p_nbr_av = BASE_IMG / "carte_nbr_avant.png"
+        p_nbr_ap = BASE_IMG / "carte_nbr_apres.png"
+        with c1:
+            if p_nbr_av.exists():
+                st.image(str(p_nbr_av), caption="NBR avant", width=IMG_W)
+            else: st.warning("Indisponible")
+        with c2:
+            if p_nbr_ap.exists():
+                st.image(str(p_nbr_ap), caption="NBR après", width=IMG_W)
+            else: st.warning("Indisponible")
+        st.markdown('<div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:6px;padding:6px 10px;font-size:0.72rem;color:#cbd5e1;margin-bottom:6px"><b>📖</b> La différence NBR met en évidence les zones de combustion intense (pixels à faible NBR post-incendie).</div>', unsafe_allow_html=True)
+
+        # ── Section 3 : dNBR + Sévérité côte à côte ──
+        st.markdown('<div class="sec" style="font-size:0.85rem;padding:4px 8px">③ dNBR & Sévérité Classifiée</div>', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        p_dnbr = BASE_IMG / "carte_dnbr.png"
+        p_sev  = BASE_IMG / "carte_severite.png"
+        with c1:
+            if p_dnbr.exists():
+                st.image(str(p_dnbr), caption="dNBR — Intensité du brûlage", width=IMG_W)
+            else: st.warning("Indisponible")
+            st.markdown('<div style="background:#0a1a0a;border:1px solid #1a3a1a;border-radius:6px;padding:5px 8px;font-size:0.72rem;color:#cbd5e1"><b>📖</b> dNBR moy. 0.0248. Zones les plus touchées (dNBR &gt; 0.27) sur pentes Sud-Est.</div>', unsafe_allow_html=True)
+        with c2:
+            if p_sev.exists():
+                st.image(str(p_sev), caption="Sévérité classifiée (USGS)", width=IMG_W)
+            else: st.warning("Indisponible")
+
+        # Table dNBR compacte
+        st.markdown("<b style='font-size:0.78rem;color:#f39c12'>Table d'interprétation dNBR</b>", unsafe_allow_html=True)
+        dnbr_rows = [
+            ["<b>dNBR</b>","<b>Sévérité</b>","<b>Description</b>"],
+            ["< 0.1", "Faible", "Végétation partiellement brûlée"],
+            ["0.1 – 0.27", "Modéré", "Destruction du couvert herbacé"],
+            ["0.27 – 0.44", "Fort", "Consommation de la litière"],
+            ["> 0.44", "Très fort", "Sol stérilisé"],
+        ]
+        dnbr_html = "<table style='width:100%;font-size:0.7rem;border-collapse:collapse'>"
+        for i, row in enumerate(dnbr_rows):
+            bg = "#0d1a2d" if i % 2 == 0 else "#0a1628"
+            text_color = "#f8fafc" if i == 0 else "#cbd5e1"
+            cells = "".join(f'<td style="padding:3px 8px;border:1px solid #2a4a6c;color:{text_color}">{c}</td>' for c in row)
+            dnbr_html += f'<tr style="background:{bg}">{cells}</tr>'
+        dnbr_html += "</table>"
+        st.markdown(dnbr_html, unsafe_allow_html=True)
+
+        # ── Section 4 : Analyse des indices (graphiques + tableau en 2 colonnes) ──
+        st.markdown('<div class="sec" style="font-size:0.85rem;padding:4px 8px">④ Analyse des Indices Spectraux</div>', unsafe_allow_html=True)
+        col_g, col_t = st.columns([1.3, 1])
+        with col_g:
+            c1, c2 = st.columns(2)
+            with c1:
+                st.plotly_chart(fig_ndvi_bars(D["idx"]), use_container_width=True, config={"displayModeBar":False})
+            with c2:
+                st.plotly_chart(fig_dnbr_radar(D["idx"]), use_container_width=True, config={"displayModeBar":False})
+            sev_fig = fig_severity_pie(D["sev"])
+            if sev_fig is not None:
+                st.plotly_chart(sev_fig, use_container_width=True, config={"displayModeBar":False})
+            else:
+                st.warning("Données de sévérité non disponibles.")
+        with col_t:
+            st.markdown("<b style='font-size:0.78rem;color:#f39c12'>Statistiques des indices</b>", unsafe_allow_html=True)
+            if D["idx"] is not None and not D["idx"].empty:
+                df_idx = D["idx"]
+                df_idx_display = df_idx.copy()
+                for col in df_idx_display.select_dtypes(include=["float64","int32","int64"]).columns:
+                    df_idx_display[col] = df_idx_display[col].apply(lambda x: f"{x:.4f}")
+                st.dataframe(df_idx_display, use_container_width=True, hide_index=True, height=180)
+            else:
+                st.warning("Indisponible.")
+
+        # ── Section 5 : Carte Topographique ──
+        st.markdown('<div class="sec" style="font-size:0.85rem;padding:4px 8px">⑤ Topographie — Contexte du Modèle ML</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">
+        Alt. {ALTITUDE} m · Pente {PENTE}° · Exp. {EXPOSITION}° (Sud-Est) · MNT 30 m (SRTM/ALOS PALSAR)
+        </div>""", unsafe_allow_html=True)
+        topo_map = folium.Map(location=[LAT, LON], zoom_start=13,
+                              tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+                              attr="© OpenTopoMap", prefer_canvas=True)
+        folium.Marker(
+            location=[LAT, LON],
+            popup=folium.Popup(f"""
+            <div style="font-family:Arial;min-width:200px">
+              <b>📍 Agdez — Paramètres topographiques</b><br>
+              Altitude : {ALTITUDE} m<br>
+              Pente : {PENTE}°<br>
+              Exposition : {EXPOSITION}° (Sud-Est)<br>
+              Zone : Drâa-Tafilalet, Maroc
+            </div>""", max_width=250),
+            tooltip="📍 Agdez",
+            icon=folium.Icon(color="red", icon="info-sign"),
+        ).add_to(topo_map)
+        folium.Circle(
+            location=[LAT, LON], radius=3000, color="#f39c12",
+            fill=True, fill_opacity=0.08, weight=1.5, dash_array="5,5",
+        ).add_to(topo_map)
+        st_folium(topo_map, width=None, height=280, key="folium_topo")
+        st.caption("OpenTopoMap — Courbes de niveau et relief de la zone d'étude")
+
+    # =========================================================================
+    # TAB 3 — IA & Modèle
+    # =========================================================================
+    with tabs[3]:
+        st.markdown('<div class="sec">🧠 Diagnostic IA</div>', unsafe_allow_html=True)
+        try:
+            from src.ai.llm_service import diagnostics as diag_ia
+            d = diag_ia()
+            api_status = "✅ Oui" if d["api_key_detected"] else "❌ Non"
+            auth_status = "✅ Connecté" if d["api_key_detected"] and not d["last_api_error"] else (
+                "⚠️ Quota dépassé" if d["last_api_error"] and "quota" in d["last_api_error"].lower()
+                else "❌ Échec" if d["last_api_error"]
+                else "⏳ Non testé"
             )
-            st.download_button("⬇️ CSV scénarios complet",
-                               data=df_sc.to_csv(index=False).encode("utf-8"),
-                               file_name="scenarios_2026_complet.csv",
-                               mime="text/csv")
+            last_err = d["last_api_error"] or "—"
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Fournisseur", d["provider"].title())
+            c2.metric("Modèle", d["model"])
+            c3.metric("Clé API détectée", api_status)
+            c4.metric("Statut authentification", auth_status)
+            st.caption(f"Dernière erreur API : {last_err}")
+        except Exception:
+            st.caption("Diagnostic IA non disponible")
+
+        st.markdown('<div class="sec">Carte d\'identité du modèle</div>', unsafe_allow_html=True)
+        mi = D["mi"]
+        if mi:
+            n_features = len(mi.get("features", []))
+            n_classes  = len(mi.get("classes", []))
+            n_train    = mi.get("n_echantillons", len(HIST))
+            acc_cv     = mi.get("accuracy_cv", None)
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Algorithme", mi.get("modele", "Random Forest"))
+            if acc_cv is not None:
+                c2.metric("Accuracy (CV)", f"{acc_cv:.1%}")
+            else:
+                c2.metric("Accuracy (CV)", "N/A")
+            c3.metric("Features", str(n_features))
+            c4.metric("Classes", str(n_classes))
+            c1b, c2b, c3b = st.columns(3)
+            c1b.metric("Échantillons train", str(n_train))
+            c2b.metric("Zone", mi.get("zone", "Agdez"))
+            c3b.metric("Période", mi.get("annees_train", "2017–2025"))
+            if mi.get("accuracy_cv_std"):
+                st.caption(f"Écart-type accuracy CV : ±{mi['accuracy_cv_std']:.1%} "
+                           f"· Validation croisée 5-fold "
+                           f"· Version {mi.get('version', '1.0.0')}")
         else:
-            st.warning("⚠️ predictions_scenarios_2026.csv introuvable.")
+            st.warning("Informations du modèle non disponibles.")
+
+        st.markdown('<div class="sec">Importance des features</div>', unsafe_allow_html=True)
+        if D["fi"] is not None:
+            st.plotly_chart(fig_fi(D["fi"]), use_container_width=True)
+            st.markdown("""
+            <div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:12px;padding:14px;font-size:0.8rem;color:#cbd5e1;line-height:1.8">
+            <b>🔍 Interprétation :</b> La température et l'humidité sont les facteurs dominants (37.4% cumulé).
+            Le stress végétal (17.5%) et l'indice de sécheresse (13.5%) traduisent l'état du combustible.
+            La pente et l'exposition (7.1% cumulé) jouent un rôle modérateur.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning("Données d'importance des features non disponibles.")
+
+        st.markdown('<div class="sec">Processus de prédiction</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="background:#0d1a2d;border:1px solid #1a3a5c;border-radius:12px;padding:14px;font-size:0.8rem;color:#cbd5e1;line-height:1.8">
+        <b>⚙️ Pipeline ML :</b><br>
+        1. <b>Entrées :</b> 13 features (météo + topographie + végétation)<br>
+        2. <b>Modèle :</b> Random Forest Classifier (100 arbres, profondeur max 10)<br>
+        3. <b>Target :</b> 4 classes (Faible, Moyen, Élevé, Très élevé)<br>
+        4. <b>Probabilités :</b> Moyenne des prédictions des arbres → softmax<br>
+        5. <b>Décision :</b> Classe avec probabilité maximale → <span style="color:{color};font-weight:bold">{risque}</span> ({conf:.0%})<br>
+        6. <b>Explication IA :</b> LLM externe (Gemini/GPT) avec fallback expert rule-based
+        </div>
+        """, unsafe_allow_html=True)
 
     # =========================================================================
-    # TAB 6 — Alertes dynamiques (avec envoi Email / Webhook)
+    # TAB 4 — Alertes (envoi + historique)
     # =========================================================================
-    with tabs[5]:
-        st.markdown('<div class="sec">Alertes dynamiques — Email · Webhook · Sauvegarde JSON</div>',
-                    unsafe_allow_html=True)
-
-        # ── Statut configuration ──────────────────────────────────────────────
+    with tabs[4]:
+        st.markdown('<div class="sec">Configuration des alertes</div>', unsafe_allow_html=True)
         erreurs_cfg = cfg_alertes.erreurs()
         if not cfg_alertes.email_actif and not cfg_alertes.webhook_actif:
-            st.warning(
-                "⚙️ **Aucun canal d'envoi activé.**\n\n"
-                "Créez le fichier **`config_alertes.json`** dans votre dossier projet "
-                "pour activer l'envoi par email et/ou webhook.",
-                icon="⚠️",
-            )
-            exemple_cfg = {
-                "email": {
-                    "actif": True,
-                    "smtp_host": "smtp.gmail.com",
-                    "smtp_port": 587,
-                    "smtp_user": "votre.email@gmail.com",
-                    "smtp_password": "mot_de_passe_application_google",
-                    "destinataires": ["pompiers@agdez.ma", "commune@agdez.ma"],
-                    "expediteur_nom": "Système Alerte Incendie Agdez"
-                },
-                "webhook": {
-                    "actif": False,
-                    "url": "https://hooks.slack.com/services/XXX/YYY/ZZZ",
-                    "type": "slack"
-                },
-                "options": {
-                    "cooldown_minutes": 60,
-                    "sauvegarder_json": True,
-                    "repertoire_rapports": "reports"
-                }
-            }
-            st.download_button(
-                "⬇️ Télécharger config_alertes.json (modèle à remplir)",
-                data=json.dumps(exemple_cfg, ensure_ascii=False, indent=2).encode("utf-8"),
-                file_name="config_alertes.json",
-                mime="application/json",
-            )
+            st.warning("⚙️ **Aucun canal d'envoi activé.**\n\nCréez `config_alertes.json` pour activer l'envoi par email (Railway) et/ou webhook.", icon="⚠️")
+            exemple_cfg = {"email":{"actif":True,"smtp_host":"smtp.gmail.com","smtp_port":587,"smtp_user":"votre.email@gmail.com","smtp_password":"mot_de_passe_application","destinataires":["pompiers@agdez.ma","commune@agdez.ma"],"expediteur_nom":"Système Alerte Incendie Agdez"},"webhook":{"actif":False,"url":"https://hooks.slack.com/...","type":"slack"},"options":{"cooldown_minutes":60,"sauvegarder_json":True,"repertoire_rapports":"reports"}}
+            st.download_button("⬇️ Modèle config_alertes.json", data=json.dumps(exemple_cfg, ensure_ascii=False, indent=2).encode("utf-8"), file_name="config_alertes.json", mime="application/json")
         elif erreurs_cfg:
             st.error("❌ Configuration incomplète : " + " · ".join(erreurs_cfg))
         else:
             canaux = []
-            if cfg_alertes.email_actif:
-                canaux.append(f"📧 Email → {', '.join(cfg_alertes.destinataires)}")
-            if cfg_alertes.webhook_actif:
-                canaux.append(f"🔗 Webhook ({cfg_alertes.webhook_type})")
+            if cfg_alertes.email_actif: canaux.append(f"📧 Email → {', '.join(cfg_alertes.destinataires)}")
+            if cfg_alertes.webhook_actif: canaux.append(f"🔗 Webhook ({cfg_alertes.webhook_type})")
             st.success("✅ Canaux actifs : " + " · ".join(canaux))
 
         st.markdown("---")
-
-        # ── Alerte courante ───────────────────────────────────────────────────
-        st.markdown("**🔴 Alerte courante (basée sur les sliders)**")
+        st.markdown("**🔴 Alerte courante**")
         if risque in ["Élevé","Très élevé"]:
-            prio    = "CRITIQUE" if risque=="Très élevé" else "HAUTE"
-            css     = "alert-r"  if risque=="Très élevé" else "alert-o"
-            tag_css = "tag-r"    if risque=="Très élevé" else "tag-o"
-            st.markdown(f"""
-            <div class="{css}">
-              <span class="tag {tag_css}">⚡ {prio}</span>
-              <div style="font-weight:700;font-size:0.95rem;margin:5px 0">
-                {RISQUE_EMOJI[risque]} Risque {risque} — {mois} {annee}
-              </div>
-              <div style="font-size:0.82rem;color:#ddd;line-height:1.8">
-                📍 Zone : Agdez, Maroc<br>
-                📊 Confiance : <b>{conf:.0%}</b><br>
-                🌡️ T={temperature}°C | 💧 H={humidite}% | 🌧️ P={precipitation}mm | 💨 V={vent}m/s<br>
-                🕐 Généré : {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}<br>
-                💬 <b>{recommendation(risque)}</b>
-              </div>
-            </div>""", unsafe_allow_html=True)
-
-            col_envoyer, col_simuler, col_info = st.columns([1, 1, 2])
+            prio = "CRITIQUE" if risque=="Très élevé" else "HAUTE"
+            css_a = "alert-r" if risque=="Très élevé" else "alert-o"
+            tag_a = "tag-r" if risque=="Très élevé" else "tag-o"
+            st.markdown(f"""<div class="{css_a}"><span class="tag {tag_a}">⚡ {prio}</span><div style="font-weight:700;font-size:0.95rem;margin:5px 0">{RISQUE_EMOJI[risque]} Risque {risque} — {mois} {annee}</div><div style="font-size:0.82rem;color:#ddd;line-height:1.8">📍 Zone : Agdez, Maroc · 📊 Confiance : <b>{conf:.0%}</b><br>🌡️ T={temperature}°C | 💧 H={humidite}% | 🌧️ P={precipitation}mm | 💨 V={vent}m/s<br>🕐 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}<br>💬 <b>{recommendation(risque)}</b></div></div>""", unsafe_allow_html=True)
+            col_envoyer, col_simuler, col_info = st.columns([1,1,2])
             with col_envoyer:
                 if st.button("📤 Envoyer l'alerte", type="primary", key="btn_envoyer_courant"):
-                    with st.spinner("⏳ Envoi en cours…"):
-                        res = envoyer_alerte(
-                            cfg_alertes, risque, conf,
-                            temperature, humidite, precipitation, vent,
-                            mois, annee, probas, recommendation(risque),
-                        )
-                    if res.get("email"):
-                        if res["email"]["succes"]:
-                            st.success(f"✅ Email envoyé → {res['email']['destinataires']}")
-                        else:
-                            st.error(res["email"]["erreur"])
-                    if res.get("webhook"):
-                        if res["webhook"]["succes"]:
-                            st.success("✅ Webhook envoyé")
-                        else:
-                            st.error(res["webhook"]["erreur"])
-                    if res.get("json") and res["json"]["succes"]:
-                        st.info(f"💾 Sauvegardée : {res['json']['fichier']}")
-
+                    with st.spinner("⏳ Envoi Railway…"):
+                        res = envoyer_alerte(cfg_alertes, risque, conf, temperature, humidite, precipitation, vent, mois, annee, probas, recommendation(risque))
+                    email_res = res.get("email") or {}
+                    webhook_res = res.get("webhook") or {}
+                    json_res = res.get("json") or {}
+                    if email_res.get("succes"): st.success(f"✅ Email envoyé → {email_res.get('destinataires','?')}")
+                    if webhook_res.get("succes"): st.success("✅ Webhook envoyé")
+                    if json_res.get("succes"): st.info(f"💾 Sauvegardée : {json_res.get('fichier','?')}")
+                    if email_res.get("erreur"): st.error(email_res["erreur"])
             with col_simuler:
-                if st.button("🧪 Simuler (voir JSON)", key="btn_simuler_courant"):
-                    st.json({
-                        "priorite": prio, "risque": risque,
-                        "confiance": f"{conf:.0%}", "periode": f"{mois} {annee}",
-                        "conditions": {"temperature": temperature, "humidite": humidite,
-                                       "precipitation": precipitation, "vent": vent},
-                        "probabilites": {k: f"{v:.0%}" for k, v in probas.items()},
-                        "recommandation": recommendation(risque),
-                    })
+                if st.button("🧪 Voir JSON", key="btn_simuler_courant"):
+                    st.json({"priorite":prio,"risque":risque,"confiance":f"{conf:.0%}","periode":f"{mois} {annee}","conditions":{"temperature":temperature,"humidite":humidite,"precipitation":precipitation,"vent":vent},"probabilites":{k:f"{v:.0%}" for k,v in probas.items()},"recommandation":recommendation(risque)})
             with col_info:
-                st.caption(
-                    f"📧 Email : {'✅' if cfg_alertes.email_actif else '❌'}  |  "
-                    f"🔗 Webhook : {'✅' if cfg_alertes.webhook_actif else '❌'}  |  "
-                    f"💾 JSON : {'✅' if cfg_alertes.sauvegarder_json else '❌'}"
-                )
+                st.caption(f"📧 Email : {'✅' if cfg_alertes.email_actif else '❌'}  |  🔗 Webhook : {'✅' if cfg_alertes.webhook_actif else '❌'}  |  💾 JSON : {'✅' if cfg_alertes.sauvegarder_json else '❌'}")
         else:
-            st.success(f"✅ Risque **{risque}** — Aucune alerte requise pour les conditions actuelles.")
+            st.success(f"✅ Risque **{risque}** — Aucune alerte.")
 
-        # ── Scénarios 2026 ────────────────────────────────────────────────────
-        st.markdown("---")
-        st.markdown("**Alertes générées par les 10 scénarios 2026**")
-        df_sc = D["sc"]
-        if df_sc is not None:
-            alerts_2026 = df_sc[df_sc["risque_predit"].isin(["Élevé","Très élevé"])]
-            st.markdown(f"**{len(alerts_2026)} scénarios** sur 10 déclenchent une alerte.")
-            for idx, r in alerts_2026.iterrows():
-                css_sc  = "alert-r" if r["risque_predit"]=="Très élevé" else "alert-o"
-                tcss_sc = "tag-r"   if r["risque_predit"]=="Très élevé" else "tag-o"
-                prio_sc = "CRITIQUE" if r["risque_predit"]=="Très élevé" else "HAUTE"
-                st.markdown(f"""
-                <div class="{css_sc}">
-                  <span class="tag {tcss_sc}">⚡ {prio_sc}</span>
-                  <div style="font-weight:700;font-size:0.87rem;margin:3px 0">{r['scenario']}</div>
-                  <div style="font-size:0.8rem;color:#aaa;line-height:1.7">
-                    {r['risque_predit']} · Confiance {r['confiance']:.0%}
-                    | T={r['temperature']}°C H={r['humidite']}% P={r['precipitation']}mm V={r['vent']}m/s<br>
-                    Prob. Très élevé: <b>{r['prob_tres_eleve']:.0%}</b>
-                    | Élevé: {r['prob_eleve']:.0%}
-                  </div>
-                </div>""", unsafe_allow_html=True)
-                if st.button(f"📤 Envoyer — {r['scenario']}", key=f"btn_sc_{idx}"):
-                    with st.spinner("Envoi…"):
-                        res_sc = envoyer_alerte(
-                            cfg_alertes, r["risque_predit"], r["confiance"],
-                            r["temperature"], r["humidite"],
-                            r["precipitation"], r["vent"], mois, annee,
-                            {"Faible": r.get("prob_faible",0), "Moyen": r.get("prob_moyen",0),
-                             "Élevé": r.get("prob_eleve",0), "Très élevé": r.get("prob_tres_eleve",0)},
-                            recommendation(r["risque_predit"]), scenario=r["scenario"],
-                        )
-                    if res_sc.get("email", {}).get("succes"):
-                        st.success(f"✅ Email envoyé — {r['scenario']}")
-                    elif res_sc.get("json", {}).get("succes"):
-                        st.info(f"💾 Sauvegardée : {res_sc['json']['fichier']}")
-                    elif res_sc.get("email"):
-                        st.error(res_sc["email"]["erreur"])
-
-        # ── Archive JSON ──────────────────────────────────────────────────────
         st.markdown("---")
         st.markdown("**Archive alertes historiques (JSON)**")
         alertes = D["alertes"]
         if alertes:
             for a in alertes:
                 prio = a.get("priorite","")
-                css  = "alert-r" if prio=="CRITIQUE" else "alert-o"
-                tcss = "tag-r"   if prio=="CRITIQUE" else "tag-o"
-                try:
-                    ts = datetime.fromisoformat(a.get("timestamp","")).strftime("%d/%m/%Y %H:%M")
-                except Exception:
-                    ts = a.get("timestamp","—")
-                st.markdown(f"""
-                <div class="{css}" style="opacity:0.8">
-                  <span class="tag {tcss}">📁 {prio}</span>
-                  <div style="font-size:0.85rem;font-weight:600;margin:3px 0">{a.get('scenario','—')}</div>
-                  <div style="font-size:0.78rem;color:#aaa">
-                    {a.get('risque','')} · {a.get('confiance',0):.0%} · {ts}
-                  </div>
-                </div>""", unsafe_allow_html=True)
+                css_a = "alert-r" if prio=="CRITIQUE" else "alert-o"
+                tag_a = "tag-r" if prio=="CRITIQUE" else "tag-o"
+                try: ts = datetime.fromisoformat(a.get("timestamp","")).strftime("%d/%m/%Y %H:%M")
+                except: ts = a.get("timestamp","—")
+                st.markdown(f"""<div class="{css_a}" style="opacity:0.8"><span class="tag {tag_a}">📁 {prio}</span><div style="font-size:0.85rem;font-weight:600;margin:3px 0">{a.get('scenario','—')}</div><div style="font-size:0.78rem;color:#aaa">{a.get('risque','')} · {a.get('confiance',0):.0%} · {ts}</div></div>""", unsafe_allow_html=True)
         else:
             st.info("Aucun fichier alerte JSON trouvé dans reports/")
-
-    # =========================================================================
-    # TAB 7 — FVT
-    # =========================================================================
-    with tabs[6]:
-        st.markdown('<div class="sec">Fenêtre de Vulnérabilité Temporelle — Été 2026</div>',
-                    unsafe_allow_html=True)
-        st.markdown("""
-        > **Concept original** : simulation journalière des 92 jours d'été
-        > pour identifier les *fenêtres continues* de risque critique —
-        > outil de planification des ressources de surveillance terrain.
-        """)
-        with st.spinner("Simulation 92 jours…"):
-            fig_fvt_chart, df_fvt = fig_fvt(model, le)
-        st.plotly_chart(fig_fvt_chart, width="stretch")
-
-        n_te = (df_fvt["risque"]=="Très élevé").sum()
-        n_el = (df_fvt["risque"]=="Élevé").sum()
-        n_cr = n_te + n_el
-        v1,v2,v3,v4 = st.columns(4)
-        v1.metric("🔴 Très élevé",   n_te)
-        v2.metric("🟠 Élevé",        n_el)
-        v3.metric("⚠️ Critiques",    n_cr)
-        v4.metric("✅ Sûrs",         92-n_cr)
-
-        # Calcul fenêtres
-        st.markdown("---")
-        st.markdown('<div class="sec">Fenêtres continues identifiées</div>',
-                    unsafe_allow_html=True)
-        df_fvt["is_c"] = df_fvt["risque"].isin(["Élevé","Très élevé"])
-        wins, in_w, start = [], False, None
-        for _, r in df_fvt.iterrows():
-            if r["is_c"] and not in_w:
-                in_w, start = True, r["date"]
-            elif not r["is_c"] and in_w:
-                in_w = False
-                wins.append({"Début":start.strftime("%d/%m/%Y"),
-                             "Fin":(r["date"]-pd.Timedelta(days=1)).strftime("%d/%m/%Y"),
-                             "Durée (jours)":(r["date"]-start).days})
-        if in_w:
-            wins.append({"Début":start.strftime("%d/%m/%Y"),
-                         "Fin":df_fvt["date"].iloc[-1].strftime("%d/%m/%Y"),
-                         "Durée (jours)":(df_fvt["date"].iloc[-1]-start).days+1})
-        if wins:
-            df_w = pd.DataFrame(wins).sort_values("Durée (jours)", ascending=False)
-            st.dataframe(df_w, width="stretch")
-            st.error(f"⚠️ Fenêtre principale : **{df_w.iloc[0]['Début']} → {df_w.iloc[0]['Fin']}** "
-                     f"= **{df_w.iloc[0]['Durée (jours)']} jours consécutifs**")
-
-        # Box plot T par risque
-        fig_bx = px.box(df_fvt, x="risque", y="temperature", color="risque",
-                        color_discrete_map=RP,
-                        title="Distribution température par niveau de risque — Été 2026",
-                        category_orders={"risque":["Faible","Moyen","Élevé","Très élevé"]})
-        fig_bx.update_layout(**DARK, showlegend=False)
-        st.plotly_chart(fig_bx, width="stretch")
-
-    # =========================================================================
-    # TAB 8 — Projections 2026-2035 (données exactes CSV modèle)
-    # =========================================================================
-    with tabs[7]:
-        st.markdown('<div class="sec">Projections 2026–2035 — Probabilités exactes du modèle</div>',
-                    unsafe_allow_html=True)
-        df_proj = D["proj"]
-        if df_proj is not None:
-            # KPIs
-            pk1,pk2,pk3,pk4,pk5 = st.columns(5)
-            pk1.metric("T° 2026",       f"{df_proj.iloc[0]['temperature']:.1f}°C")
-            pk2.metric("T° 2035",       f"{df_proj.iloc[-1]['temperature']:.1f}°C",
-                       f"+{df_proj.iloc[-1]['temperature']-df_proj.iloc[0]['temperature']:.1f}°C")
-            pk3.metric("H% 2026",       f"{df_proj.iloc[0]['humidite']:.1f}%")
-            pk4.metric("H% 2035",       f"{df_proj.iloc[-1]['humidite']:.1f}%",
-                       f"{df_proj.iloc[-1]['humidite']-df_proj.iloc[0]['humidite']:.1f}%")
-            pk5.metric("P(>Élevé) min", f"{(df_proj['prob_eleve']+df_proj['prob_tres_eleve']).min():.0%}")
-
-            st.markdown("---")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.plotly_chart(fig_proj_temp(df_proj), width="stretch")
-            with c2:
-                st.plotly_chart(fig_proj_prob_evol(df_proj), width="stretch")
-
-            c3, c4 = st.columns(2)
-            with c3:
-                st.plotly_chart(fig_proj_heatmap(df_proj), width="stretch")
-            with c4:
-                # Précipitations projetées
-                fig_pp = go.Figure(go.Bar(
-                    x=df_proj["annee"], y=df_proj["precipitation"],
-                    marker_color="#3498db",
-                    text=[f"{v:.1f}" for v in df_proj["precipitation"]],
-                    textposition="outside",
-                ))
-                fig_pp.update_layout(title="Précipitations projetées juillet (mm)",
-                                     **DARK, yaxis_title="mm")
-                st.plotly_chart(fig_pp, width="stretch")
-
-            # Tableau complet données exactes
-            st.markdown('<div class="sec" style="margin-top:10px">Tableau — toutes les probabilités exactes</div>',
-                        unsafe_allow_html=True)
-            st.dataframe(
-                df_proj.style
-                .map(style_risque, subset=["risque_predit"])
-                .format({"temperature":"{:.3f}°C","humidite":"{:.3f}%",
-                         "precipitation":"{:.3f}mm","vent":"{:.4f}m/s",
-                         "confiance":"{:.3f}","prob_faible":"{:.4f}",
-                         "prob_moyen":"{:.4f}","prob_eleve":"{:.4f}",
-                         "prob_tres_eleve":"{:.4f}"}),
-                width="stretch",
-            )
-            st.download_button("⬇️ Projections complètes (.csv)",
-                               data=df_proj.to_csv(index=False).encode("utf-8"),
-                               file_name="projections_2026_2035.csv", mime="text/csv")
-        else:
-            st.warning("⚠️ projections_climatiques.csv introuvable.")
-
-    # =========================================================================
-    # TAB 9 — Comparateur d'années
-    # =========================================================================
-    with tabs[8]:
-        st.markdown('<div class="sec">Comparateur d\'années 2017–2035</div>',
-                    unsafe_allow_html=True)
-        df_proj = D["proj"]
-
-        all_years = list(range(2017, 2036))
-        ca1, ca2  = st.columns(2)
-        with ca1:
-            yr_a = st.selectbox("Année A", all_years, index=9, key="cmp_a")
-        with ca2:
-            yr_b = st.selectbox("Année B", all_years, index=18, key="cmp_b")
-
-        def get_year_data(yr):
-            """Retourne (t,h,p,v,risque,conf,probas) pour une année."""
-            if yr <= 2025:
-                h = HIST.get(yr, HIST[2025])
-                # Données juillet
-                t, hum, p, v = h["temperature"]+9.0, h["humidite"]-12.0, h["precipitation"]/3, h["vent"]
-                risque_r, conf_r, probas_r = ml_predict(model, le, t, hum, p, v, 1)
-                return t, hum, p, v, risque_r, conf_r, probas_r
-            elif df_proj is not None:
-                row = df_proj[df_proj["annee"]==yr]
-                if not row.empty:
-                    r = row.iloc[0]
-                    return (r["temperature"], r["humidite"], r["precipitation"], r["vent"],
-                            r["risque_predit"], r["confiance"],
-                            {"Faible":r["prob_faible"],"Moyen":r["prob_moyen"],
-                             "Élevé":r["prob_eleve"],"Très élevé":r["prob_tres_eleve"]})
-            return 32.0, 16.0, 10.0, 4.0, "—", 0.0, {}
-
-        ta,ha,pa,va,la,ca_v,pa_d = get_year_data(yr_a)
-        tb,hb,pb,vb,lb,cb,pb_d   = get_year_data(yr_b)
-
-        def year_card(col, yr, t, h, p, v, lbl, cnf, probas_d):
-            c_clr = RISQUE_COLOR.get(lbl,"#888")
-            col.markdown(f"""
-            <div style="text-align:center;padding:14px;background:#16213e;
-                        border-radius:12px;border:2px solid {c_clr};margin-bottom:12px">
-              <div style="font-size:1.8rem">{RISQUE_EMOJI.get(lbl,'⚪')}</div>
-              <div style="font-size:1.5rem;font-weight:800;color:{c_clr}">{yr}</div>
-              <div style="font-size:0.95rem;color:{c_clr};font-weight:600">{lbl}</div>
-              <div style="font-size:0.75rem;color:#666">{cnf:.0%} confiance</div>
-            </div>""", unsafe_allow_html=True)
-            for lbl_v, val in [("🌡️ T°C",f"{t:.1f}°C"),("💧 H%",f"{h:.1f}%"),
-                                ("🌧️ P mm",f"{p:.1f}mm"),("💨 V m/s",f"{v:.2f}m/s")]:
-                col.markdown(f"""
-                <div style="display:flex;justify-content:space-between;padding:5px 8px;
-                            background:#0d0d1a;border-radius:5px;margin-bottom:4px;
-                            font-family:'Space Mono',monospace;font-size:0.73rem">
-                  <span style="color:#a0aec0">{lbl_v}</span>
-                  <span style="color:#ddd;font-weight:bold">{val}</span>
-                </div>""", unsafe_allow_html=True)
-            # Probabilités
-            if probas_d:
-                for cls, pb_v in probas_d.items():
-                    clr = RISQUE_COLOR.get(cls,"#888")
-                    col.markdown(f"""
-                    <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-                      <div style="width:72px;font-size:0.65rem;font-family:'Space Mono',monospace;color:#a0aec0">{cls}</div>
-                      <div style="flex:1;background:#222;border-radius:2px;height:7px">
-                        <div style="background:{clr};width:{pb_v*100:.0f}%;height:7px;border-radius:2px"></div>
-                      </div>
-                      <div style="font-size:0.65rem;font-family:'Space Mono',monospace;color:#a0aec0;width:32px;text-align:right">{pb_v:.0%}</div>
-                    </div>""", unsafe_allow_html=True)
-
-        col_a, col_sep, col_b = st.columns([5,1,5])
-        year_card(col_a, yr_a, ta, ha, pa, va, la, ca_v, pa_d)
-        col_sep.markdown("<div style='text-align:center;padding-top:70px;font-size:1.3rem;color:#a0aec0'>VS</div>",
-                         unsafe_allow_html=True)
-        year_card(col_b, yr_b, tb, hb, pb, vb, lb, cb, pb_d)
-
-        # Graphique comparatif
-        fig_cmp = go.Figure()
-        fig_cmp.add_trace(go.Bar(name=str(yr_a), x=["T(°C)","H(%)","P(mm)","V(m/s)"],
-                                  y=[ta,ha,pa,va],
-                                  marker_color=RISQUE_COLOR.get(la,"#888"),
-                                  text=[f"{ta:.1f}",f"{ha:.1f}",f"{pa:.1f}",f"{va:.2f}"],
-                                  textposition="outside"))
-        fig_cmp.add_trace(go.Bar(name=str(yr_b), x=["T(°C)","H(%)","P(mm)","V(m/s)"],
-                                  y=[tb,hb,pb,vb],
-                                  marker_color=RISQUE_COLOR.get(lb,"#555"),
-                                  text=[f"{tb:.1f}",f"{hb:.1f}",f"{pb:.1f}",f"{vb:.2f}"],
-                                  textposition="outside"))
-        fig_cmp.update_layout(title=f"Comparaison juillet — {yr_a} vs {yr_b}",
-                              barmode="group", **DARK)
-        st.plotly_chart(fig_cmp, width="stretch")
-
-        # Deltas
-        st.markdown('<div class="sec">Évolution entre les deux années</div>',
-                    unsafe_allow_html=True)
-        d1,d2,d3,d4 = st.columns(4)
-        for col_d, nm, va_v, vb_v, u in [
-            (d1,"🌡️ Température",ta,tb,"°C"),
-            (d2,"💧 Humidité",   ha,hb,"%"),
-            (d3,"🌧️ Pluie",      pa,pb,"mm"),
-            (d4,"💨 Vent",       va,vb,"m/s"),
-        ]:
-            col_d.metric(nm, f"{vb_v:.1f}{u}", f"{vb_v-va_v:+.1f}{u}")
-
-    # =========================================================================
-    # TAB 10 — Modèle & Données
-    # =========================================================================
-    with tabs[9]:
-        st.markdown('<div class="sec">Modèle Random Forest · Feature Importance · Données brutes</div>',
-                    unsafe_allow_html=True)
-
-     
-        mi = D["mi"]
-        df_fi_data = D["fi"]
-
-        if mi:
-            m1,m2,m3,m4,m5 = st.columns(5)
-            m1.metric("Algorithme",   mi.get("modele","—"))
-            m2.metric("Accuracy CV",  f"{mi.get('accuracy_cv',0):.1%}")
-            m3.metric("Écart-type",   f"±{mi.get('accuracy_cv_std',0):.1%}")
-            m4.metric("Train",        mi.get("annees_train","—"))
-            m5.metric("Version",      mi.get("version","—"))
-
-            feats   = mi.get("features", [])
-            classes = mi.get("classes", [])
-            feat_html  = " · ".join([f"<code style='background:#1a2a3a;padding:1px 5px;border-radius:3px;font-size:0.75rem'>{f}</code>" for f in feats])
-            class_html = " · ".join([f"<span style='color:{RP.get(c,'#888')};font-weight:bold'>{c}</span>" for c in classes])
-            st.markdown(f"""
-            <div class="ibox" style="font-size:0.79rem;line-height:2">
-            <b>Features ({len(feats)}) :</b> {feat_html}<br>
-            <b>Classes ({len(classes)}) :</b> {class_html}
-            </div>""", unsafe_allow_html=True)
-
-        if df_fi_data is not None:
-            st.markdown("---")
-            c1, c2 = st.columns([3,1])
-            with c1:
-                st.plotly_chart(fig_fi(df_fi_data), use_container_width=True)
-            with c2:
-                st.plotly_chart(fig_fi_pie(df_fi_data), use_container_width=True)
-
-            df_fi_d = df_fi_data.copy()
-            df_fi_d["importance_%"] = df_fi_d["importance"] * 100
-            st.dataframe(
-                df_fi_d.style
-                .format({"importance":"{:.6f}","importance_%":"{:.2f}%"})
-                .background_gradient(subset=["importance"], cmap="Reds"),
-                use_container_width=True
-            )
-
-        # Explorer données
-        st.markdown("---")
-        st.markdown('<div class="sec">Explorer & télécharger les données</div>',
-                    unsafe_allow_html=True)
-        sources = {
-            "Scénarios 2026":           D["sc"],
-            "Projections 2026–2035":    D["proj"],
-            "Feature importance":       D["fi"],
-            "Données annuelles":        D["ann"],
-            "Conditions été 2025":      D["ete"],
-            "Récap incendie":           D["recap"],
-        }
-        chosen = st.selectbox("Dataset", list(sources.keys()))
-        df_ch  = sources[chosen]
-        if df_ch is not None:
-            st.dataframe(df_ch, use_container_width=True)
-            st.download_button(
-                f"⬇️ {chosen}",
-                data=df_ch.to_csv(index=False).encode("utf-8"),
-                file_name=f"{chosen[:30].replace(' ','_')}.csv",
-                mime="text/csv"
-            )
 
     # ── Footer ────────────────────────────────────────────────────────────────
     st.markdown("---")
@@ -2223,6 +1570,8 @@ def main():
         Données 2017–2025 · Drâa-Tafilalet, Maroc 🇲🇦 ·
         Mis à jour : {datetime.now().strftime('%d/%m/%Y %H:%M')}
     </div>""", unsafe_allow_html=True)
+
+
 
 
 if __name__ == "__main__":

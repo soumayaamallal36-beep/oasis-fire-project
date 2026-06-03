@@ -143,15 +143,17 @@ def train() -> tuple:
 
     # 6. Métadonnées JSON ─────────────────────────────────────
     meta = {
-        "modele":          meilleur_nom,
-        "features":        FEATURE_COLUMNS,
-        "classes":         RISQUE_CLASSES,
-        "accuracy_cv":     round(meilleur["accuracy_mean"], 4),
-        "accuracy_cv_std": round(meilleur["accuracy_std"], 4),
-        "zone":            CFG["zone"]["nom"],
-        "pays":            CFG["zone"]["pays"],
-        "annees_train":    "2017–2025",
-        "version":         "1.0.0",
+        "modele":            meilleur_nom,
+        "features":          FEATURE_COLUMNS,
+        "classes":           RISQUE_CLASSES,
+        "accuracy_cv":       round(meilleur["accuracy_mean"], 4),
+        "accuracy_cv_std":   round(meilleur["accuracy_std"], 4),
+        "n_echantillons":    len(df),
+        "annees_train":      "2017–2025",
+        "validation":        "StratifiedKFold 5-fold (pas de split train/test)",
+        "zone":              CFG["zone"]["nom"],
+        "pays":              CFG["zone"]["pays"],
+        "version":           "1.0.0",
     }
     meta_path = METADATA_DIR / "model_info.json"
     with open(meta_path, "w", encoding="utf-8") as f:
